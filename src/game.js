@@ -57,20 +57,29 @@ class Game {
     const p = this.players.get(id);
     if (!p) return;
     p.connected = false;
-    // 若在牌局中且轮到他，超时逻辑会自动处理；不立刻起身
-    if (!this.hand || p.seat === null) {
-      this._removeIfIdle(id);
-    }
-    this._reassignHost();
     this._log(`${p.name} 掉线`);
+    // 非牌局进行中（等待/结算）：立即释放座位，让房间状态刷新、他人可入座
+    if (this.status !== 'playing') {
+      this._removePlayer(id);
+    }
+    // 牌局进行中：保留座位，由超时逻辑自动处理其行动；当局结束后在 _finishHand 中统一清理
+    this._reassignHost();
     this._changed();
   }
 
-  _removeIfIdle(id) {
+  _removePlayer(id) {
     const p = this.players.get(id);
     if (!p) return;
     if (p.seat !== null) this.seats[p.seat] = null;
     this.players.delete(id);
+  }
+
+  // 清理所有已掉线的真人玩家（机器人始终在线，不受影响）
+  _cleanupDisconnected() {
+    for (const [pid, p] of [...this.players.entries()]) {
+      if (!p.connected) this._removePlayer(pid);
+    }
+    this._reassignHost();
   }
 
   _reassignHost() {
@@ -98,8 +107,9 @@ class Game {
       { name: '丰川祥子', style: '压迫控场', profile: { tight: 0.03, aggression: 1.5, bluff: 1.0, call: 0.85, allin: 0.5 } },
     ];
     const used = new Set([...this.players.values()].map((p) => p.name));
-    let entry = botCatalog.find((x) => !used.has(x.name));
-    if (!entry) entry = botCatalog[Math.floor(Math.random() * botCatalog.length)];
+    const unused = botCatalog.filter((x) => !used.has(x.name));
+    const pool = unused.length ? unused : botCatalog;
+    const entry = pool[Math.floor(Math.random() * pool.length)];
     const name = entry.name;
     const id = 'bot' + crypto.randomBytes(8).toString('hex');
     const bot = this.addPlayer(id, name, { isBot: true });
@@ -616,6 +626,8 @@ class Game {
     for (const p of this.players.values()) {
       if (p.seat !== null && p.stack <= 0) p.sittingOut = true;
     }
+    // 本局结束：释放掉线玩家的座位，房间状态刷新
+    this._cleanupDisconnected();
     this._changed();
     this._scheduleAutoNext();
   }

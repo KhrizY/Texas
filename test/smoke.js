@@ -40,7 +40,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   let ok = true;
   const assert = (cond, msg) => { if (!cond) { ok = false; console.error('  ✗ ' + msg); } };
   try {
-    await wait(700);
+    await wait(1200);
     const health = JSON.parse(await httpGet('/health'));
     assert(health.ok === true, '/health 正常');
 

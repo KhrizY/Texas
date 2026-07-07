@@ -121,6 +121,19 @@ wss.on('connection', (ws) => {
         res = g.act(ws.playerId, String(msg.action), Number(msg.amount) || 0);
         break;
       case 'ping': send(ws, { type: 'pong' }); return;
+      case 'chat': {
+        const pp = room.game.players.get(ws.playerId);
+        const text = String(msg.text || '').slice(0, 200).trim();
+        if (!pp || !text) return;
+        // 广播给房间内所有客户端（含发送者，由其客户端渲染）
+        const payload = JSON.stringify({ type: 'chat', name: pp.name, text, ts: Date.now() });
+        for (const [, cws] of room.clients) {
+          if (cws.readyState === cws.OPEN) {
+            try { cws.send(payload); } catch { /* ignore */ }
+          }
+        }
+        return;
+      }
       default: res = { error: '未知指令' };
     }
     if (res && res.error) send(ws, { type: 'error', msg: res.error });

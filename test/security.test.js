@@ -32,7 +32,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
   try {
-    await wait(700);
+    await wait(1200);
 
     // 1) playerId 劫持修复：客户端指定 id，服务器应忽略并重新生成
     await new Promise((resolve) => {

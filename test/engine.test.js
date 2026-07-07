@@ -166,5 +166,45 @@ function forceShowdown(ids, seatList, holes, board, committed) {
   assert(!pay[2], 'R2 不应赢，实际' + pay[2]);
 }
 
+console.log('— 掉线释放座位 —');
+// 等待中掉线：立即释放座位并移除玩家，房间刷新
+{
+  const g = new Game('disc1', { actionTimeoutMs: 999999 });
+  g.addPlayer('A', 'A'); g.sit('A', 0);
+  g.disconnect('A');
+  assert(g.seats[0] === null, '等待中掉线应立即释放座位');
+  assert(!g.players.has('A'), '等待中掉线应移除玩家');
+  assert(g._seatedActive().length === 0, '座位计数应归零');
+}
+// 牌局进行中掉线：暂留座位（由超时处理），本局结束后统一清理
+{
+  const g = new Game('disc2', { actionTimeoutMs: 999999 });
+  g.addPlayer('A', 'A'); g.addPlayer('B', 'B');
+  g.sit('A', 0); g.sit('B', 1);
+  const r = g.startHand('A');
+  assert(!r.error, '开局不应报错');
+  assert(g.status === 'playing', '状态应为 playing');
+  g.disconnect('A');
+  assert(g.seats[0] !== null, '牌局进行中掉线应暂留座位');
+  assert(g.players.get('A').connected === false, '应标记掉线');
+  // 让 B 把牌局打完；掉线的 A 由超时逻辑自动弃牌（此处模拟 _onTimeout）
+  let guard = 0;
+  while (g.status === 'playing' && guard++ < 60) {
+    const actor = g.hand.actor;
+    if (actor === null) break;
+    const id = g.seats[actor];
+    const p = g.players.get(id);
+    if (p && !p.connected) { g._onTimeout(actor); continue; }
+    const st = g.hand.ps[actor];
+    const toCall = g.hand.currentBet - st.roundBet;
+    if (toCall > 0) g.act(id, 'call', 0); else g.act(id, 'check', 0);
+  }
+  assert(g.status === 'showdown', '牌局应结束');
+  assert(g.seats[0] === null, '本局结束后掉线玩家座位应被清理');
+  assert(!g.players.has('A'), '本局结束后掉线玩家应被移除');
+  // A 翻牌前弃牌（剩 995 筹码），随离场离开牌桌；B 赢走 15 底池 -> 990+15=1005
+  assert(g.players.get('B').stack === 1005, '未离场玩家筹码正确（赢走底池），实际' + g.players.get('B').stack);
+}
+
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);

@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/engine.test.js"
+    "test": "node test/engine.test.js && node test/smoke.js && node test/security.test.js && node test/features.test.js"
   },
   "dependencies": {
     "express": "^4.19.2",

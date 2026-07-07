@@ -139,6 +139,7 @@ function handle(msg) {
     return;
   }
   if (msg.type === 'error') { toast(msg.msg); return; }
+  if (msg.type === 'chat') { appendChat(msg.name, msg.text); return; }
   if (msg.type === 'state') {
     prevState = state;
     state = msg;
@@ -211,6 +212,27 @@ function chipStackEl(amount, compact) {
   return wrap;
 }
 
+function walletChipEl(amount) {
+  const wrap = document.createElement('div');
+  wrap.className = 'chip-stack compact';
+  const parts = breakdown(amount);
+  if (!parts.length) return wrap;
+  const top = parts[parts.length - 1]; // 取最大面额，避免多牌堆横向变宽遮挡名字
+  const pile = document.createElement('div');
+  pile.className = 'chip-pile';
+  const shown = Math.min(top.count, 3);
+  for (let i = 0; i < shown; i++) {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.style.background = top.c;
+    chip.style.color = top.t;
+    chip.style.bottom = (i * 4) + 'px';
+    pile.appendChild(chip);
+  }
+  wrap.appendChild(pile);
+  return wrap;
+}
+
 function renderPot() {
   const box = $('potBox');
   box.innerHTML = '';
@@ -225,11 +247,31 @@ function renderPot() {
   }
 }
 
-// 座位极坐标
-function seatPos(offset, total, factor) {
-  const theta = Math.PI / 2 + (offset / total) * 2 * Math.PI;
-  const rx = 47 * (factor || 1), ry = 45 * (factor || 1);
-  return { x: 50 + rx * Math.cos(theta), y: 50 + ry * Math.sin(theta) };
+// 座位沿胶囊（圆角矩形拉满）周长排布：你的座位在底部正中
+// 以单位 u 计算（桌面 16 x 10），再换算成百分比
+function seatPos(offset, total) {
+  const R = 5, straight = 6;                 // 半圆半径 / 直边长度
+  const P = 2 * straight + 2 * Math.PI * R;  // 周长
+  const d0 = straight + Math.PI * R + straight / 2; // 底中（你的座位）对应弧长
+  let d = (d0 + (offset / total) * P) % P;
+  if (d < 0) d += P;
+  let x, y, nx, ny;                          // 点 + 指向桌心（内）的法线
+  if (d <= straight) {                        // 顶边（左→右）
+    x = R + d; y = 0; nx = 0; ny = 1;
+  } else if (d <= straight + Math.PI * R) {   // 右半圆
+    const a = d - straight, th = -Math.PI / 2 + a / R;
+    x = (R + straight) + R * Math.cos(th); y = R + R * Math.sin(th);
+    nx = -Math.cos(th); ny = -Math.sin(th);
+  } else if (d <= 2 * straight + Math.PI * R) { // 底边（右→左）
+    const a2 = d - (straight + Math.PI * R); x = (R + straight) - a2; y = 2 * R; nx = 0; ny = -1;
+  } else {                                    // 左半圆
+    const a3 = d - (2 * straight + Math.PI * R), th = Math.PI / 2 + a3 / R;
+    x = R + R * Math.cos(th); y = R + R * Math.sin(th);
+    nx = -Math.cos(th); ny = -Math.sin(th);
+  }
+  const m = 1.4;                             // 内缩量（单位 u），让卡片落在台面内、贴近木边
+  x += nx * m; y += ny * m;
+  return { x: x / 16 * 100, y: y / 10 * 100 };
 }
 
 function renderSeats() {
@@ -241,7 +283,7 @@ function renderSeats() {
 
   for (let s = 0; s < total; s++) {
     const offset = seated ? ((s - yourSeat + total) % total) : s;
-    const pos = seatPos(offset, total, 1);
+    const pos = seatPos(offset, total);
     const seatData = state.seats[s];
 
     const wrap = document.createElement('div');
@@ -258,23 +300,12 @@ function renderSeats() {
       wrap.appendChild(empty);
     } else {
       wrap.appendChild(playerBox(seatData));
-
-      // 持有资金筹码堆：放在玩家框靠桌面内侧的位置，不占用玩家信息框高度
-      if (seatData.stack > 0) {
-        const wp = seatPos(offset, total, 0.78);
-        const wallet = document.createElement('div');
-        wallet.className = 'wallet-chips-layer';
-        wallet.style.left = wp.x + '%';
-        wallet.style.top = wp.y + '%';
-        wallet.appendChild(chipStackEl(seatData.stack, true));
-        layer.appendChild(wallet);
-      }
     }
     layer.appendChild(wrap);
 
-    // 下注筹码（朝中心方向）
+    // 下注筹码（位于玩家与底池之间，更靠近中心，避免遮挡卡片）
     if (seatData && seatData.roundBet > 0) {
-      const bp = seatPos(offset, total, 0.58);
+      const bp = { x: 50 + (pos.x - 50) * 0.38, y: 50 + (pos.y - 50) * 0.38 };
       const bet = document.createElement('div');
       bet.className = 'bet-chips-layer';
       bet.style.left = bp.x + '%';
@@ -337,6 +368,14 @@ function playerBox(p) {
   if (p.allIn) badges.appendChild(badge('ALL-IN', 'allin'));
   if (p.sittingOut && !p.inHand) badges.appendChild(badge('暂离', 'out'));
   box.appendChild(badges);
+
+  // 玩家筹码堆：放在人物卡片右侧，不遮挡卡片
+  if (p.stack > 0) {
+    const wallet = document.createElement('div');
+    wallet.className = 'wallet-side';
+    wallet.appendChild(walletChipEl(p.stack));
+    box.appendChild(wallet);
+  }
 
   const w = state.winners && state.winners.find((x) => x.seat === p.seat);
   if (state.status === 'showdown' && w && w.reveal) {
@@ -512,6 +551,32 @@ function renderLog() {
   box.scrollTop = box.scrollHeight;
 }
 
+// ---------- 聊天 ----------
+function appendChat(name, text) {
+  const box = $('chatLog');
+  if (!box) return;
+  const line = document.createElement('div');
+  line.className = 'chat-line';
+  const nm = document.createElement('span');
+  nm.className = 'chat-name';
+  nm.textContent = name + '：';
+  const tx = document.createElement('span');
+  tx.className = 'chat-text';
+  tx.textContent = text; // textContent 天然防 XSS
+  line.appendChild(nm);
+  line.appendChild(tx);
+  box.appendChild(line);
+  while (box.children.length > 120) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+}
+function sendChat() {
+  const inp = $('chatText');
+  const text = inp.value.trim();
+  if (!text) return;
+  send({ type: 'chat', text });
+  inp.value = '';
+}
+
 // ---------- 飞行筹码动画 ----------
 function rectCenter(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
 function feltCenter() { const el = document.querySelector('.felt'); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
@@ -682,6 +747,16 @@ $('soundBtn').onclick = () => {
   updateSoundButton();
 };
 updateSoundButton();
+
+// 聊天面板
+$('chatBtn').onclick = () => {
+  const p = $('chatPanel');
+  p.classList.toggle('hidden');
+  if (!p.classList.contains('hidden')) $('chatText').focus();
+};
+$('chatClose').onclick = () => $('chatPanel').classList.add('hidden');
+$('chatSend').onclick = sendChat;
+$('chatText').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
 
 $('autoNextBtn').onclick = () => send({ type: 'setAutoNext', enabled: !(state && state.autoNext) });
 $('startBtn').onclick = () => send({ type: 'start' });

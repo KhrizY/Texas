@@ -39,8 +39,10 @@
       <div class="room-info">房间 <b id="roomLabel"></b> · 盲注 <b id="blindLabel"></b></div>
       <div id="statusLabel" class="status-label">等待中</div>
       <div class="top-actions">
+        <button id="chatBtn" class="btn btn-ghost" title="聊天">💬</button>
         <button id="soundBtn" class="btn btn-ghost" title="音效开关">🔊</button>
         <button id="hostBtn" class="btn btn-ghost hidden">🎁 增发</button>
+        <button id="autoNextBtn" class="btn btn-ghost hidden">自动下一局：关</button>
         <button id="leaveBtn" class="btn btn-ghost">离开</button>
       </div>
     </header>
@@ -58,7 +60,6 @@
 
     <div id="controls" class="controls">
       <div id="hostControls" class="host-controls hidden">
-          <button id="autoNextBtn" class="btn btn-ghost">自动下一局：关</button>
           <button id="startBtn" class="btn btn-primary">开始本局</button>
         <button id="nextBtn" class="btn btn-primary hidden">开始下一局</button>
       </div>
@@ -81,6 +82,19 @@
     </div>
 
     <div id="logBox" class="log-box"></div>
+
+    <!-- 房间聊天面板 -->
+    <div id="chatPanel" class="chat-panel hidden">
+      <div class="chat-head">
+        <b>💬 房间聊天</b>
+        <button id="chatClose" class="btn btn-ghost">✕</button>
+      </div>
+      <div id="chatLog" class="chat-log"></div>
+      <div class="chat-input">
+        <input id="chatText" maxlength="200" placeholder="说点什么…" />
+        <button id="chatSend" class="btn btn-primary">发送</button>
+      </div>
+    </div>
   </div>
 
   <!-- 房主增发筹码面板 -->
