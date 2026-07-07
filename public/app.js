@@ -34,6 +34,7 @@ let state = null;
 let prevState = null;
 let myId = localStorage.getItem('poker_pid') || '';
 let myRoom = '';
+let myPwd = '';
 let reconnectTimer = null;
 let raiseTarget = 0;
 let muted = localStorage.getItem('poker_muted') === '1';
@@ -112,16 +113,17 @@ function wsURL() {
   u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
   return u.toString();
 }
-function connect(nick, room) {
+function connect(nick, room, pwd) {
   myRoom = room;
+  myPwd = pwd || '';
   ws = new WebSocket(wsURL());
-  ws.onopen = () => send({ type: 'join', roomId: room, nickname: nick, playerId: myId || undefined });
+  ws.onopen = () => send({ type: 'join', roomId: room, nickname: nick, password: myPwd, playerId: myId || undefined });
   ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch { return; } handle(m); };
   ws.onclose = () => {
     if (myRoom) {
       $('statusLabel').textContent = '连接断开，重连中…';
       clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(() => connect(nick, room), 1500);
+      reconnectTimer = setTimeout(() => connect(nick, room, myPwd), 1500);
     }
   };
   ws.onerror = () => { try { ws.close(); } catch {} };
@@ -640,10 +642,17 @@ async function loadRooms() {
       const item = document.createElement('button');
       item.className = 'room-item';
       const st = r.status === 'playing' ? '进行中' : (r.status === 'showdown' ? '结算中' : '等待中');
-      item.innerHTML = `<b>${esc(r.roomId)}</b><span>${st} · ${r.seatedCount}人 · BOT ${r.bots}</span>`;
+      const lock = r.locked ? ' 🔒' : '';
+      item.innerHTML = `<b>${esc(r.roomId)}${lock}</b><span>${st} · ${r.seatedCount}人 · BOT ${r.bots}</span>`;
       item.onclick = () => {
         $('room').value = r.roomId;
         if (!$('nick').value.trim()) $('nick').value = '观众' + Math.floor(Math.random() * 90 + 10);
+        if (r.locked) {
+          // 加锁房间：填好房间号并聚焦密码框，等用户输密码
+          $('pwd').focus();
+          toast('该房间已加密，请输入密码');
+          return;
+        }
         $('enterBtn').click();
       };
       box.appendChild(item);
@@ -659,9 +668,10 @@ setInterval(() => { if (!$('login').classList.contains('hidden')) loadRooms(); }
 $('enterBtn').onclick = () => {
   const nick = $('nick').value.trim() || '玩家' + Math.floor(Math.random() * 900 + 100);
   const room = $('room').value.trim() || 'main';
+  const pwd = $('pwd').value;
   localStorage.setItem('poker_nick', nick);
   localStorage.setItem('poker_room', room);
-  connect(nick, room);
+  connect(nick, room, pwd);
 };
 $('nick').value = localStorage.getItem('poker_nick') || '';
 $('room').value = localStorage.getItem('poker_room') || '';
@@ -678,3 +688,4 @@ $('startBtn').onclick = () => send({ type: 'start' });
 $('nextBtn').onclick = () => send({ type: 'next' });
 $('leaveBtn').onclick = () => { myRoom = ''; if (ws) { try { ws.close(); } catch {} } location.reload(); };
 $('room').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('enterBtn').click(); });
+$('pwd').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('enterBtn').click(); });

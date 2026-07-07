@@ -1,5 +1,5 @@
 'use strict';
-// 针对性验证安全修复：playerId 劫持 + XSS 转义
+// 针对性验证安全修复：playerId 劫持 + XSS 转义 + 房间密码
 const http = require('http');
 const { spawn } = require('child_process');
 const WebSocket = require('ws');
@@ -95,6 +95,55 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       setTimeout(() => { if (!done) { ws.close(); resolve(false); } }, 2000);
     });
     assert(reject, "非整数座位 (seat:'abc') 被服务端拒绝");
+
+    // 5) 房主设密码：错误密码被拒绝
+    const wrongRejected = await new Promise((resolve) => {
+      const a = new WebSocket(`ws://127.0.0.1:${PORT}/`);
+      a.on('open', () => a.send(JSON.stringify({ type: 'join', roomId: 'lockr', nickname: '主', password: '1234' })));
+      a.on('message', (raw) => {
+        const m = JSON.parse(raw.toString());
+        if (m.type === 'joined') {
+          const b = new WebSocket(`ws://127.0.0.1:${PORT}/`);
+          let done = false;
+          b.on('open', () => b.send(JSON.stringify({ type: 'join', roomId: 'lockr', nickname: '客', password: 'wrong' })));
+          b.on('message', (raw2) => {
+            const m2 = JSON.parse(raw2.toString());
+            if (m2.type === 'error' && /密码错误/.test(m2.msg) && !done) { done = true; b.close(); a.close(); resolve(true); }
+          });
+          setTimeout(() => { if (!done) { b.close(); a.close(); resolve(false); } }, 2000);
+        }
+      });
+    });
+    assert(wrongRejected, '加锁房间：错误密码被拒绝');
+
+    // 6) 正确密码可进，且 /api/rooms 标记 locked
+    const correctJoins = await new Promise((resolve) => {
+      const a = new WebSocket(`ws://127.0.0.1:${PORT}/`);
+      a.on('open', () => a.send(JSON.stringify({ type: 'join', roomId: 'lockr2', nickname: '主', password: 'pass' })));
+      a.on('message', (raw) => {
+        const m = JSON.parse(raw.toString());
+        if (m.type === 'joined') {
+          a.send(JSON.stringify({ type: 'sit', seat: 0 }));
+          const b = new WebSocket(`ws://127.0.0.1:${PORT}/`);
+          let okB = false;
+          b.on('open', () => b.send(JSON.stringify({ type: 'join', roomId: 'lockr2', nickname: '客', password: 'pass' })));
+          b.on('message', (raw2) => {
+            const m2 = JSON.parse(raw2.toString());
+            if (m2.type === 'joined' && !okB) {
+              okB = true;
+              httpGet('/api/rooms').then((d) => {
+                const rooms = JSON.parse(d);
+                const r = (rooms.rooms || []).find((x) => x.roomId === 'lockr2');
+                const okLock = !!r && r.locked === true;
+                a.close(); b.close(); resolve(okB && okLock);
+              }).catch(() => { a.close(); b.close(); resolve(okB); });
+            }
+          });
+          setTimeout(() => { if (!okB) { a.close(); b.close(); resolve(false); } }, 2000);
+        }
+      });
+    });
+    assert(correctJoins, '加锁房间：正确密码可进，且 /api/rooms 标记 locked');
 
     console.log(ok ? '\n安全修复验证通过 ✅' : '\n安全修复验证失败 ❌');
   } catch (e) {

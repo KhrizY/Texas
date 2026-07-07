@@ -19,6 +19,7 @@ app.get('/api/rooms', (req, res) => {
       handNumber: g.handNumber,
       pot: g.hand ? g._collectPot() : 0,
       bots: [...g.players.values()].filter((p) => p.isBot).length,
+      locked: !!room.password,
     };
   }).filter((r) => r.seatedCount > 0 || r.status === 'playing');
   res.json({ rooms: list });
@@ -68,9 +69,18 @@ wss.on('connection', (ws) => {
     if (t === 'join') {
       const roomId = String(msg.roomId || 'main').slice(0, 24).trim() || 'main';
       const name = String(msg.nickname || '玩家').slice(0, 16).trim() || '玩家';
+      // 房主建房时可设置密码；已加锁房间需正确密码，错误则拒绝（且不创建房间）
+      const existing = rooms.get(roomId);
+      const pwd = msg.password != null ? String(msg.password) : '';
+      if (existing && existing.password && pwd !== existing.password) {
+        send(ws, { type: 'error', msg: '房间密码错误' });
+        return;
+      }
+      const isNew = !existing;
+      const room = getRoom(roomId);
+      if (isNew && pwd) room.password = pwd.slice(0, 32);
       // 身份由服务端统一生成，绝不接受客户端指定的 playerId，杜绝会话顶替
       const playerId = crypto.randomBytes(16).toString('hex');
-      const room = getRoom(roomId);
       ws.playerId = playerId;
       ws.roomId = roomId;
       room.clients.set(playerId, ws);
