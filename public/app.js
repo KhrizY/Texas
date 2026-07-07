@@ -1,0 +1,680 @@
+'use strict';
+const $ = (id) => document.getElementById(id);
+const SUITS = ['♠', '♥', '♦', '♣'];
+const RANKS = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
+const rankStr = (r) => RANKS[r] || String(r);
+
+// 转义用户输入，防止 innerHTML 注入（XSS）
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// 筹码面额与配色（不同数值不同颜色）
+const DENOMS = [
+  { v: 1000, c: '#f5c542', t: '#4a3b00' },
+  { v: 500, c: '#9b59b6', t: '#ffffff' },
+  { v: 100, c: '#2c3e50', t: '#ffffff' },
+  { v: 25, c: '#35b26a', t: '#04351c' },
+  { v: 5, c: '#e0524a', t: '#ffffff' },
+  { v: 1, c: '#ecf0f1', t: '#2b2b2b' },
+];
+function breakdown(amount) {
+  const out = [];
+  let a = Math.max(0, Math.floor(amount));
+  for (const d of DENOMS) {
+    const n = Math.floor(a / d.v);
+    if (n > 0) { out.push({ ...d, count: n }); a -= n * d.v; }
+  }
+  return out;
+}
+
+let ws = null;
+let state = null;
+let prevState = null;
+let myId = localStorage.getItem('poker_pid') || '';
+let myRoom = '';
+let reconnectTimer = null;
+let raiseTarget = 0;
+let muted = localStorage.getItem('poker_muted') === '1';
+let audioCtx = null;
+
+// ---------- 音效 ----------
+function ensureAudio() {
+  if (muted) return null;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
+function tone(freq, duration, type, gain, delay) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const t0 = ctx.currentTime + (delay || 0);
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.setValueAtTime(freq, t0);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain || 0.05, t0 + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  osc.connect(g).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + duration + 0.03);
+}
+function noise(duration, gain, delay) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const t0 = ctx.currentTime + (delay || 0);
+  const len = Math.max(1, Math.floor(ctx.sampleRate * duration));
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = ctx.createBufferSource();
+  const filter = ctx.createBiquadFilter();
+  const g = ctx.createGain();
+  filter.type = 'bandpass';
+  filter.frequency.value = 900;
+  g.gain.value = gain || 0.04;
+  src.buffer = buf;
+  src.connect(filter).connect(g).connect(ctx.destination);
+  src.start(t0);
+}
+function playSound(name) {
+  if (muted) return;
+  if (name === 'deal') { noise(0.08, 0.025); tone(520, 0.06, 'triangle', 0.025, 0.015); }
+  else if (name === 'bet') { tone(220, 0.05, 'square', 0.035); tone(330, 0.07, 'square', 0.025, 0.045); noise(0.07, 0.018, 0.02); }
+  else if (name === 'turn') { tone(660, 0.08, 'sine', 0.045); tone(880, 0.08, 'sine', 0.035, 0.08); }
+  else if (name === 'win') { tone(523, 0.10, 'triangle', 0.045); tone(659, 0.10, 'triangle', 0.045, 0.10); tone(784, 0.16, 'triangle', 0.05, 0.20); }
+}
+function updateSoundButton() {
+  const btn = $('soundBtn');
+  if (!btn) return;
+  btn.textContent = muted ? '🔇' : '🔊';
+  btn.title = muted ? '开启音效' : '关闭音效';
+}
+
+// ---------- WebSocket ----------
+function baseURL(path) {
+  const u = new URL(location.href);
+  u.search = ''; u.hash = '';
+  const last = u.pathname.split('/').pop() || '';
+  if (!u.pathname.endsWith('/')) {
+    if (last.includes('.')) u.pathname = u.pathname.replace(/[^/]*$/, '');
+    else u.pathname += '/';
+  }
+  return new URL(path, u).toString();
+}
+
+function wsURL() {
+  const u = new URL(baseURL(''));
+  u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+  return u.toString();
+}
+function connect(nick, room) {
+  myRoom = room;
+  ws = new WebSocket(wsURL());
+  ws.onopen = () => send({ type: 'join', roomId: room, nickname: nick, playerId: myId || undefined });
+  ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch { return; } handle(m); };
+  ws.onclose = () => {
+    if (myRoom) {
+      $('statusLabel').textContent = '连接断开，重连中…';
+      clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(() => connect(nick, room), 1500);
+    }
+  };
+  ws.onerror = () => { try { ws.close(); } catch {} };
+}
+function send(obj) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj)); }
+
+function handle(msg) {
+  if (msg.type === 'joined') {
+    myId = msg.playerId;
+    localStorage.setItem('poker_pid', myId);
+    $('login').classList.add('hidden');
+    $('game').classList.remove('hidden');
+    return;
+  }
+  if (msg.type === 'error') { toast(msg.msg); return; }
+  if (msg.type === 'state') {
+    prevState = state;
+    state = msg;
+    render();
+    runAnimations();
+    runSounds();
+  }
+}
+
+// ---------- 渲染 ----------
+function render() {
+  if (!state) return;
+  const s = state;
+  $('roomLabel').textContent = s.roomId;
+  $('blindLabel').textContent = `${s.config.sb}/${s.config.bb}`;
+  const map = { waiting: '等待开始', playing: `第 ${s.handNumber} 局 · ${streetName(s.street)}`, showdown: '本局结束' };
+  $('statusLabel').textContent = map[s.status] || '';
+  $('hostBtn').classList.toggle('hidden', !s.you.isHost);
+
+  renderBoard();
+  renderPot();
+  renderSeats();
+  renderControls();
+  renderWinner();
+  renderLog();
+  if (!$('hostPanel').classList.contains('hidden')) renderGrantList();
+}
+function streetName(st) {
+  return { preflop: '翻牌前', flop: '翻牌', turn: '转牌', river: '河牌', showdown: '摊牌' }[st] || '';
+}
+
+function cardEl(c, mini) {
+  const el = document.createElement('div');
+  if (!c) { el.className = 'card back' + (mini ? ' mini' : ''); return el; }
+  el.className = 'card' + (mini ? ' mini' : '') + ((c.s === 1 || c.s === 2) ? ' red' : '');
+  el.innerHTML = `<div class="r">${rankStr(c.r)}</div><div class="s">${SUITS[c.s]}</div>`;
+  return el;
+}
+function renderBoard() {
+  const box = $('board');
+  box.innerHTML = '';
+  (state.board || []).forEach((c) => box.appendChild(cardEl(c, false)));
+}
+
+// 筹码堆元素
+function chipStackEl(amount, compact) {
+  const wrap = document.createElement('div');
+  wrap.className = 'chip-stack' + (compact ? ' compact' : '');
+  const parts = breakdown(amount);
+  for (const p of parts) {
+    const pile = document.createElement('div');
+    pile.className = 'chip-pile';
+    const shown = Math.min(p.count, compact ? 3 : 5);
+    for (let i = 0; i < shown; i++) {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.style.background = p.c;
+      chip.style.color = p.t;
+      chip.style.bottom = (i * 4) + 'px';
+      if (p.count > shown) chip.classList.add('many');
+      if (i === shown - 1) chip.textContent = p.count > shown ? '×' + p.count : String(p.v);
+      pile.appendChild(chip);
+    }
+    wrap.appendChild(pile);
+  }
+  const label = document.createElement('div');
+  label.className = 'chip-amt';
+  label.textContent = amount;
+  wrap.appendChild(label);
+  return wrap;
+}
+
+function renderPot() {
+  const box = $('potBox');
+  box.innerHTML = '';
+  if (state.pot > 0 && state.status !== 'showdown') {
+    box.classList.remove('hidden');
+    const lab = document.createElement('span');
+    lab.className = 'pot-label'; lab.textContent = '底池';
+    box.appendChild(lab);
+    box.appendChild(chipStackEl(state.pot, true));
+  } else {
+    box.classList.add('hidden');
+  }
+}
+
+// 座位极坐标
+function seatPos(offset, total, factor) {
+  const theta = Math.PI / 2 + (offset / total) * 2 * Math.PI;
+  const rx = 47 * (factor || 1), ry = 45 * (factor || 1);
+  return { x: 50 + rx * Math.cos(theta), y: 50 + ry * Math.sin(theta) };
+}
+
+function renderSeats() {
+  const layer = $('seats');
+  layer.innerHTML = '';
+  const total = state.config.maxSeats;
+  const yourSeat = state.you.seat;
+  const seated = yourSeat !== null;
+
+  for (let s = 0; s < total; s++) {
+    const offset = seated ? ((s - yourSeat + total) % total) : s;
+    const pos = seatPos(offset, total, 1);
+    const seatData = state.seats[s];
+
+    const wrap = document.createElement('div');
+    wrap.className = 'seat';
+    wrap.style.left = pos.x + '%';
+    wrap.style.top = pos.y + '%';
+
+    if (!seatData) {
+      const empty = document.createElement('div');
+      empty.className = 'seat-empty';
+      empty.textContent = `坐下 (${s + 1})`;
+      if (!seated && state.status !== 'playing') empty.onclick = () => send({ type: 'sit', seat: s });
+      else { empty.style.opacity = '.5'; empty.style.cursor = 'default'; }
+      wrap.appendChild(empty);
+    } else {
+      wrap.appendChild(playerBox(seatData));
+
+      // 持有资金筹码堆：放在玩家框靠桌面内侧的位置，不占用玩家信息框高度
+      if (seatData.stack > 0) {
+        const wp = seatPos(offset, total, 0.78);
+        const wallet = document.createElement('div');
+        wallet.className = 'wallet-chips-layer';
+        wallet.style.left = wp.x + '%';
+        wallet.style.top = wp.y + '%';
+        wallet.appendChild(chipStackEl(seatData.stack, true));
+        layer.appendChild(wallet);
+      }
+    }
+    layer.appendChild(wrap);
+
+    // 下注筹码（朝中心方向）
+    if (seatData && seatData.roundBet > 0) {
+      const bp = seatPos(offset, total, 0.58);
+      const bet = document.createElement('div');
+      bet.className = 'bet-chips-layer';
+      bet.style.left = bp.x + '%';
+      bet.style.top = bp.y + '%';
+      bet.appendChild(chipStackEl(seatData.roundBet, true));
+      layer.appendChild(bet);
+    }
+  }
+  renderTimers();
+}
+
+function playerBox(p) {
+  const box = document.createElement('div');
+  box.className = 'player-box';
+  if (p.isActor) box.classList.add('actor');
+  if (p.folded) box.classList.add('folded');
+  const isWinner = state.winners && state.winners.some((w) => w.seat === p.seat && w.amount > 0);
+  if (state.status === 'showdown' && isWinner) box.classList.add('winner');
+  box.dataset.seat = p.seat;
+
+  if (p.hasCards && !p.folded) {
+    const hc = document.createElement('div');
+    hc.className = 'hole-cards';
+    if (p.hole) p.hole.forEach((c) => hc.appendChild(cardEl(c, true)));
+    else { hc.appendChild(cardEl(null, true)); hc.appendChild(cardEl(null, true)); }
+    box.appendChild(hc);
+  }
+
+  const info = document.createElement('div');
+  info.className = 'player-info';
+
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.textContent = (p.name || '?').trim().slice(0, 1).toUpperCase();
+  info.appendChild(avatar);
+
+  const text = document.createElement('div');
+  text.className = 'player-text';
+  const name = document.createElement('div');
+  name.className = 'pname';
+  name.textContent = p.name + (p.connected ? '' : ' 💤');
+  text.appendChild(name);
+
+  const stack = document.createElement('div');
+  stack.className = 'pstack';
+  stack.textContent = '💰 ' + p.stack;
+  text.appendChild(stack);
+  info.appendChild(text);
+
+  box.appendChild(info);
+
+  const badges = document.createElement('div');
+  badges.className = 'pbadges';
+  if (p.isBot) badges.appendChild(badge('BOT', 'bot'));
+  if (p.isButton) badges.appendChild(badge('D', 'd'));
+  if (p.isSmallBlind) badges.appendChild(badge('SB', 'sb'));
+  if (p.isBigBlind) badges.appendChild(badge('BB', 'bb'));
+  if (p.isYou) badges.appendChild(badge('你', 'you'));
+  if (p.isHost) badges.appendChild(badge('房主', 'host'));
+  if (p.allIn) badges.appendChild(badge('ALL-IN', 'allin'));
+  if (p.sittingOut && !p.inHand) badges.appendChild(badge('暂离', 'out'));
+  box.appendChild(badges);
+
+  const w = state.winners && state.winners.find((x) => x.seat === p.seat);
+  if (state.status === 'showdown' && w && w.reveal) {
+    const hn = document.createElement('div');
+    hn.className = 'pstack';
+    hn.style.color = '#fff';
+    hn.textContent = w.handName + (w.amount > 0 ? ` +${w.amount}` : '');
+    box.appendChild(hn);
+  }
+
+  if (p.isActor && state.status === 'playing') {
+    const ring = document.createElement('div');
+    ring.className = 'timer-ring';
+    ring.innerHTML = '<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect class="timer-track" x="3" y="3" width="94" height="94" rx="10" ry="10" pathLength="100"/><rect class="timer-progress" x="3" y="3" width="94" height="94" rx="10" ry="10" pathLength="100"/></svg>';
+    box.appendChild(ring);
+  }
+  return box;
+}
+function badge(text, cls) {
+  const b = document.createElement('span');
+  b.className = 'badge ' + cls; b.textContent = text; return b;
+}
+
+function renderTimers() {
+  if (!state || state.status !== 'playing' || state.actor === null) return;
+  const box = document.querySelector(`.player-box[data-seat="${state.actor}"] .timer-ring`);
+  if (!box) return;
+  const total = state.config.actionTimeoutMs;
+  const left = Math.max(0, state.deadline - Date.now());
+  const frac = Math.max(0, Math.min(1, left / total));
+  const pct = Math.round(frac * 100);
+  const color = frac > 0.4 ? '#f5c542' : '#e0524a';
+  const progress = box.querySelector('.timer-progress');
+  if (progress) {
+    progress.style.strokeDasharray = '100';
+    progress.style.strokeDashoffset = String(100 - pct);
+    progress.style.stroke = color;
+  }
+}
+setInterval(renderTimers, 100);
+
+// ---------- 控制区 ----------
+function renderControls() {
+  const s = state;
+  const host = $('hostControls'), action = $('actionBar'), wait = $('waitHint');
+  host.classList.add('hidden'); action.classList.add('hidden'); wait.textContent = '';
+  const oldRebuy = $('rebuyBtn'); if (oldRebuy) oldRebuy.remove();
+
+  if (s.you.isHost) {
+    host.classList.remove('hidden');
+    $('autoNextBtn').textContent = `自动下一局：${s.autoNext ? '开' : '关'}`;
+    $('autoNextBtn').classList.toggle('btn-primary', !!s.autoNext);
+    $('autoNextBtn').classList.toggle('btn-ghost', !s.autoNext);
+  }
+
+  const yourTurn = s.legal && s.actor === s.you.seat;
+  if (yourTurn) { action.classList.remove('hidden'); return setupActionBar(s.legal); }
+
+  if (s.you.seated && s.you.stack <= 0 && s.status !== 'playing') {
+    const rb = document.createElement('button');
+    rb.id = 'rebuyBtn'; rb.className = 'btn btn-primary';
+    rb.textContent = `补充筹码 (+${s.config.startStack})`;
+    rb.onclick = () => send({ type: 'rebuy' });
+    host.classList.remove('hidden'); host.appendChild(rb);
+  }
+
+  if (s.you.isHost && s.status !== 'playing' && s.seatedCount >= 2) {
+    host.classList.remove('hidden');
+    $('startBtn').classList.toggle('hidden', s.status !== 'waiting');
+    $('nextBtn').classList.toggle('hidden', s.status !== 'showdown');
+  } else { $('startBtn').classList.add('hidden'); $('nextBtn').classList.add('hidden'); }
+  $('autoNextBtn').classList.toggle('hidden', !s.you.isHost);
+
+  if (!s.you.seated) wait.textContent = '点击空位坐下参与游戏（也可旁观）';
+  else if (s.status === 'waiting') wait.textContent = s.you.isHost ? (s.seatedCount < 2 ? '等待更多玩家入座…' : '') : '等待房主开始…';
+  else if (s.status === 'playing') {
+    const actor = s.actor !== null ? s.seats[s.actor] : null;
+    wait.textContent = actor ? `等待 ${actor.name} 行动…` : '发牌中…';
+  } else if (s.status === 'showdown') wait.textContent = s.you.isHost ? '' : '本局结束，等待房主开始下一局…';
+}
+
+// 指数映射 + 整十吸附
+function snapTen(v, min, max) {
+  if (v <= min) return min;
+  if (v >= max) return max;
+  const r = Math.round(v / 10) * 10;
+  return Math.max(min, Math.min(max, r));
+}
+function posToAmount(pos, min, max) {
+  const t = pos / 1000;
+  let raw;
+  if (min > 0) raw = min * Math.pow(max / min, t); // 指数：低端精细，高端粗放
+  else raw = min + (max - min) * t;
+  return snapTen(raw, min, max);
+}
+function amountToPos(amt, min, max) {
+  if (max <= min) return 0;
+  let t;
+  if (min > 0) t = Math.log(amt / min) / Math.log(max / min);
+  else t = (amt - min) / (max - min);
+  return Math.max(0, Math.min(1000, Math.round(t * 1000)));
+}
+
+function setupActionBar(legal) {
+  const foldBtn = $('foldBtn'), checkBtn = $('checkBtn'), callBtn = $('callBtn');
+  const raiseBtn = $('raiseBtn'), slider = $('raiseSlider');
+
+  foldBtn.onclick = () => send({ type: 'action', action: 'fold' });
+  checkBtn.classList.toggle('hidden', !legal.canCheck);
+  checkBtn.onclick = () => send({ type: 'action', action: 'check' });
+  callBtn.classList.toggle('hidden', !legal.canCall);
+  callBtn.textContent = '跟注 ' + legal.callAmount;
+  callBtn.onclick = () => send({ type: 'action', action: 'call' });
+
+  const raiseGroup = raiseBtn.closest('.raise-group');
+  if (!legal.canRaise) { raiseGroup.style.display = 'none'; return; }
+  raiseGroup.style.display = '';
+
+  const min = legal.minRaiseTo, max = legal.maxRaiseTo;
+  const label = legal.isOpen ? '下注' : '加注到';
+  slider.min = 0; slider.max = 1000; slider.step = 1;
+
+  raiseTarget = Math.max(min, Math.min(max, raiseTarget || min));
+  const setTarget = (amt) => {
+    raiseTarget = Math.max(min, Math.min(max, snapTen(amt, min, max)));
+    $('raiseAmt').textContent = raiseTarget;
+  };
+  slider.value = amountToPos(raiseTarget, min, max);
+  raiseBtn.innerHTML = `${label} <span id="raiseAmt">${raiseTarget}</span>`;
+
+  slider.oninput = () => {
+    const amt = posToAmount(+slider.value, min, max);
+    raiseTarget = amt;
+    $('raiseAmt').textContent = amt;
+  };
+  raiseBtn.onclick = () => send({ type: 'action', action: legal.isOpen ? 'bet' : 'raise', amount: raiseTarget });
+
+  document.querySelectorAll('.chip-btn').forEach((btn) => {
+    btn.onclick = () => {
+      const mul = btn.dataset.mul;
+      let target;
+      const pot = state.pot;
+      if (mul === 'min') target = min;
+      else if (mul === 'max') target = max;
+      else {
+        const base = legal.isOpen ? 0 : state.currentBet;
+        target = base + Math.round(pot * parseFloat(mul));
+      }
+      setTarget(target);
+      slider.value = amountToPos(raiseTarget, min, max);
+    };
+  });
+}
+
+function renderWinner() {
+  const banner = $('winnerBanner');
+  if (state.status === 'showdown' && state.winners && state.winners.length) {
+    const top = state.winners.filter((w) => w.amount > 0);
+    if (top.length) {
+      const names = top.map((w) => (state.seats[w.seat] ? state.seats[w.seat].name : '?') + ' +' + w.amount);
+      banner.textContent = `🏆 ${names.join('  |  ')}`;
+      banner.classList.remove('hidden');
+      return;
+    }
+  }
+  banner.classList.add('hidden');
+}
+
+function renderLog() {
+  const box = $('logBox');
+  box.innerHTML = '';
+  (state.log || []).forEach((line) => { const d = document.createElement('div'); d.textContent = line; box.appendChild(d); });
+  box.scrollTop = box.scrollHeight;
+}
+
+// ---------- 飞行筹码动画 ----------
+function rectCenter(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+function feltCenter() { const el = document.querySelector('.felt'); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+
+function flyChips(from, to, amount, opts) {
+  opts = opts || {};
+  const layer = $('flyLayer');
+  const parts = breakdown(amount);
+  let colors = [];
+  for (const p of parts) for (let i = 0; i < Math.min(p.count, 3); i++) colors.push(p.c);
+  if (colors.length === 0) colors = ['#f5c542'];
+  const count = Math.min(14, Math.max(3, colors.length));
+  for (let i = 0; i < count; i++) {
+    const chip = document.createElement('div');
+    chip.className = 'chip fly';
+    chip.style.background = colors[i % colors.length];
+    const jx = (Math.random() - 0.5) * 26, jy = (Math.random() - 0.5) * 26;
+    chip.style.left = from.x + 'px'; chip.style.top = from.y + 'px';
+    layer.appendChild(chip);
+    const delay = i * 35 + (opts.delay || 0);
+    requestAnimationFrame(() => {
+      chip.style.transition = `transform .55s cubic-bezier(.3,.7,.3,1) ${delay}ms, opacity .3s ${delay + 450}ms`;
+      chip.style.transform = `translate(${to.x - from.x + jx}px, ${to.y - from.y + jy}px) scale(.9)`;
+      if (opts.fade) chip.style.opacity = '0';
+    });
+    setTimeout(() => chip.remove(), delay + 900);
+  }
+}
+
+function runAnimations() {
+  if (!state) return;
+  // 下注：本轮注额增加 -> 从玩家飞向中心
+  if (prevState && prevState.handNumber === state.handNumber &&
+      prevState.street === state.street && state.status === 'playing') {
+    for (let s = 0; s < state.seats.length; s++) {
+      const now = state.seats[s], was = prevState.seats[s];
+      if (now && was && now.roundBet > was.roundBet) {
+        const box = document.querySelector(`.player-box[data-seat="${s}"]`);
+        if (box) flyChips(rectCenter(box), feltCenter(), now.roundBet - was.roundBet, { fade: true });
+      }
+    }
+  }
+  // 摊牌：中心筹码飞入赢家
+  if (state.status === 'showdown' && (!prevState || prevState.status !== 'showdown') && state.winners) {
+    const center = feltCenter();
+    state.winners.filter((w) => w.amount > 0).forEach((w, i) => {
+      const box = document.querySelector(`.player-box[data-seat="${w.seat}"]`);
+      if (box) flyChips(center, rectCenter(box), w.amount, { delay: 250 + i * 120 });
+    });
+  }
+}
+
+function runSounds() {
+  if (!state || !prevState) return;
+  if (prevState.handNumber !== state.handNumber && state.status === 'playing') playSound('deal');
+  if ((prevState.board?.length || 0) < (state.board?.length || 0)) playSound('turn');
+  if (prevState.status !== 'showdown' && state.status === 'showdown') playSound('win');
+  if (prevState.actor !== state.actor && state.actor === state.you.seat && state.status === 'playing') playSound('turn');
+  if (prevState.handNumber === state.handNumber && state.status === 'playing') {
+    for (let s = 0; s < state.seats.length; s++) {
+      const now = state.seats[s], was = prevState.seats[s];
+      if (now && was && now.roundBet > was.roundBet) { playSound('bet'); break; }
+    }
+  }
+}
+
+// ---------- 房主增发面板 ----------
+function renderGrantList() {
+  const list = $('grantList');
+  list.innerHTML = '';
+  const seated = state.seats.filter(Boolean);
+  if (seated.length === 0) { list.innerHTML = '<div class="grant-empty">暂无在座玩家</div>'; return; }
+  for (const p of seated) {
+    const row = document.createElement('div');
+    row.className = 'grant-row';
+    row.innerHTML = `<span class="grant-name">${esc(p.name)}${p.isBot ? ' 🤖' : ''}${p.isYou ? '（你）' : ''}</span><span class="grant-stack">💰 ${p.stack}</span>`;
+    [200, 500, 1000].forEach((amt) => {
+      const b = document.createElement('button');
+      b.className = 'btn btn-primary grant-btn';
+      b.textContent = '+' + amt;
+      b.onclick = () => send({ type: 'grant', seat: p.seat, amount: amt });
+      row.appendChild(b);
+    });
+    if (p.isBot) {
+      const rm = document.createElement('button');
+      rm.className = 'btn btn-fold grant-btn';
+      rm.textContent = '移除';
+      rm.onclick = () => send({ type: 'removeBot', seat: p.seat });
+      row.appendChild(rm);
+    }
+    list.appendChild(row);
+  }
+}
+$('hostBtn').onclick = () => { $('hostPanel').classList.remove('hidden'); renderGrantList(); };
+$('addBotBtn').onclick = () => send({ type: 'addBot' });
+$('hostClose').onclick = () => $('hostPanel').classList.add('hidden');
+$('hostPanel').onclick = (e) => { if (e.target.id === 'hostPanel') $('hostPanel').classList.add('hidden'); };
+document.querySelectorAll('.grant-all').forEach((b) => {
+  b.onclick = () => {
+    const amt = +b.dataset.amt;
+    state.seats.filter(Boolean).forEach((p) => send({ type: 'grant', seat: p.seat, amount: amt }));
+  };
+});
+
+// ---------- 提示 ----------
+let toastTimer = null;
+function toast(text) {
+  const t = $('toast');
+  t.textContent = text; t.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 2200);
+}
+
+// ---------- 登录 ----------
+async function loadRooms() {
+  const box = $('roomList');
+  if (!box) return;
+  try {
+    const res = await fetch(baseURL('api/rooms'), { cache: 'no-store' });
+    const data = await res.json();
+    const rooms = data.rooms || [];
+    box.innerHTML = '';
+    if (!rooms.length) {
+      box.innerHTML = '<span class="muted-small">暂无房间，创建一个吧</span>';
+      return;
+    }
+    rooms.forEach((r) => {
+      const item = document.createElement('button');
+      item.className = 'room-item';
+      const st = r.status === 'playing' ? '进行中' : (r.status === 'showdown' ? '结算中' : '等待中');
+      item.innerHTML = `<b>${esc(r.roomId)}</b><span>${st} · ${r.seatedCount}人 · BOT ${r.bots}</span>`;
+      item.onclick = () => {
+        $('room').value = r.roomId;
+        if (!$('nick').value.trim()) $('nick').value = '观众' + Math.floor(Math.random() * 90 + 10);
+        $('enterBtn').click();
+      };
+      box.appendChild(item);
+    });
+  } catch (e) {
+    box.innerHTML = '<span class="muted-small">房间列表加载失败</span>';
+  }
+}
+$('refreshRoomsBtn').onclick = loadRooms;
+loadRooms();
+setInterval(() => { if (!$('login').classList.contains('hidden')) loadRooms(); }, 5000);
+
+$('enterBtn').onclick = () => {
+  const nick = $('nick').value.trim() || '玩家' + Math.floor(Math.random() * 900 + 100);
+  const room = $('room').value.trim() || 'main';
+  localStorage.setItem('poker_nick', nick);
+  localStorage.setItem('poker_room', room);
+  connect(nick, room);
+};
+$('nick').value = localStorage.getItem('poker_nick') || '';
+$('room').value = localStorage.getItem('poker_room') || '';
+$('soundBtn').onclick = () => {
+  muted = !muted;
+  localStorage.setItem('poker_muted', muted ? '1' : '0');
+  if (!muted) { ensureAudio(); playSound('turn'); }
+  updateSoundButton();
+};
+updateSoundButton();
+
+$('autoNextBtn').onclick = () => send({ type: 'setAutoNext', enabled: !(state && state.autoNext) });
+$('startBtn').onclick = () => send({ type: 'start' });
+$('nextBtn').onclick = () => send({ type: 'next' });
+$('leaveBtn').onclick = () => { myRoom = ''; if (ws) { try { ws.close(); } catch {} } location.reload(); };
+$('room').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('enterBtn').click(); });

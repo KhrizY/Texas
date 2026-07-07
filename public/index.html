@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>德州扑克 · 在线房间</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%99%A0%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <!-- 登录页 -->
+  <div id="login" class="login">
+    <div class="login-card">
+      <div class="brand">♠ 德州扑克 ♥</div>
+      <p class="sub">输入昵称与房间号，和朋友坐同一张桌</p>
+      <label>昵称</label>
+      <input id="nick" maxlength="16" placeholder="例如：老王" />
+      <label>房间号</label>
+      <input id="room" maxlength="24" placeholder="例如：888（同号进同房）" />
+      <button id="enterBtn" class="btn btn-primary">进入房间</button>
+      <div class="room-list-panel">
+        <div class="room-list-head">
+          <b>正在开的房间</b>
+          <button id="refreshRoomsBtn" class="mini-link">刷新</button>
+        </div>
+        <div id="roomList" class="room-list"><span class="muted-small">暂无房间</span></div>
+      </div>
+      <div class="rules">
+        <span>2–9 人动态入座</span><span>·</span><span>无限注</span><span>·</span><span>昵称即玩</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 牌桌页 -->
+  <div id="game" class="game hidden">
+    <header class="topbar">
+      <div class="room-info">房间 <b id="roomLabel"></b> · 盲注 <b id="blindLabel"></b></div>
+      <div id="statusLabel" class="status-label">等待中</div>
+      <div class="top-actions">
+        <button id="soundBtn" class="btn btn-ghost" title="音效开关">🔊</button>
+        <button id="hostBtn" class="btn btn-ghost hidden">🎁 增发</button>
+        <button id="leaveBtn" class="btn btn-ghost">离开</button>
+      </div>
+    </header>
+
+    <div class="table-wrap">
+      <div class="felt">
+        <div class="table-center">
+          <div id="board" class="board"></div>
+          <div id="potBox" class="pot-box hidden"><span class="pot-label">底池</span> <span id="potAmt">0</span></div>
+          <div id="winnerBanner" class="winner-banner hidden"></div>
+        </div>
+        <div id="seats"></div>
+      </div>
+    </div>
+
+    <div id="controls" class="controls">
+      <div id="hostControls" class="host-controls hidden">
+          <button id="autoNextBtn" class="btn btn-ghost">自动下一局：关</button>
+          <button id="startBtn" class="btn btn-primary">开始本局</button>
+        <button id="nextBtn" class="btn btn-primary hidden">开始下一局</button>
+      </div>
+      <div id="actionBar" class="action-bar hidden">
+        <button id="foldBtn" class="btn btn-fold">弃牌</button>
+        <button id="checkBtn" class="btn btn-check">过牌</button>
+        <button id="callBtn" class="btn btn-call">跟注</button>
+        <div class="raise-group">
+          <input id="raiseSlider" type="range" min="0" max="100" value="0" />
+          <div class="raise-meta">
+            <button class="chip-btn" data-mul="min">最小</button>
+            <button class="chip-btn" data-mul="0.5">½池</button>
+            <button class="chip-btn" data-mul="1">底池</button>
+            <button class="chip-btn" data-mul="max">全下</button>
+          </div>
+          <button id="raiseBtn" class="btn btn-raise">加注 <span id="raiseAmt">0</span></button>
+        </div>
+      </div>
+      <div id="waitHint" class="wait-hint"></div>
+    </div>
+
+    <div id="logBox" class="log-box"></div>
+  </div>
+
+  <!-- 房主增发筹码面板 -->
+  <div id="hostPanel" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <b>🎁 房主控制 · 增发筹码</b>
+        <button id="hostClose" class="btn btn-ghost">✕</button>
+      </div>
+      <p class="modal-sub">给指定玩家实时增发筹码，或添加/移除机器人陪玩</p>
+      <div class="bot-tools">
+        <button id="addBotBtn" class="btn btn-primary">🤖 添加机器人</button>
+      </div>
+      <div id="grantList" class="grant-list"></div>
+      <div class="grant-quick">
+        <span>全体增发：</span>
+        <button class="btn btn-ghost grant-all" data-amt="500">+500</button>
+        <button class="btn btn-ghost grant-all" data-amt="1000">+1000</button>
+        <button class="btn btn-ghost grant-all" data-amt="2000">+2000</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <div id="flyLayer" class="fly-layer"></div>
+  <script src="./app.js"></script>
+</body>
+</html>

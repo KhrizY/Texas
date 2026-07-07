@@ -1,0 +1,15 @@
+{
+  "name": "texas-holdem",
+  "version": "1.0.0",
+  "description": "多人在线德州扑克 - 昵称即玩，动态人数，简洁平面",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/engine.test.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}
