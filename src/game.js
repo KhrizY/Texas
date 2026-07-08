@@ -12,6 +12,7 @@ class Game {
     this.id = id;
     this.config = {
       maxSeats: opts.maxSeats || 9,
+      minSeats: opts.minSeats || 6,
       sb: opts.sb || 5,
       bb: opts.bb || 10,
       startStack: opts.startStack || 1000,
@@ -88,6 +89,18 @@ class Game {
     this.hostId = next ? next.id : null;
   }
 
+  // 动态座位数：初始默认 minSeats(6) 个位置；占用达到 minSeats 后随人数 +1 扩展，最高 maxSeats(9)；始终保持均匀分布
+  activeSeatCount() {
+    const MIN = this.config.minSeats, MAX = this.config.maxSeats;
+    let occupied = 0, maxIdx = -1;
+    for (let s = 0; s < this.seats.length; s++) {
+      if (this.seats[s]) { occupied++; if (s > maxIdx) maxIdx = s; }
+    }
+    let n = Math.max(MIN, occupied + (occupied >= MIN ? 1 : 0));
+    if (maxIdx + 1 > n) n = maxIdx + 1; // 不遗漏任何已占座位
+    return Math.min(MAX, n);
+  }
+
   addBot(byId) {
     if (byId && byId !== this.hostId) return { error: '只有房主可以添加机器人' };
     const emptySeat = this.seats.findIndex((x) => !x);
@@ -141,7 +154,7 @@ class Game {
   sit(id, seat) {
     const p = this.players.get(id);
     if (!p) return { error: '玩家不存在' };
-    if (seat < 0 || seat >= this.config.maxSeats) return { error: '座位无效' };
+    if (seat < 0 || seat >= this.activeSeatCount()) return { error: '座位无效' };
     if (this.seats[seat]) return { error: '该座位已被占用' };
     if (p.seat !== null) this.seats[p.seat] = null;
     p.seat = seat;
@@ -720,7 +733,8 @@ class Game {
     return {
       type: 'state',
       roomId: this.id,
-      config: { sb: cfg.sb, bb: cfg.bb, maxSeats: cfg.maxSeats, startStack: cfg.startStack, actionTimeoutMs: cfg.actionTimeoutMs },
+      activeSeats: this.activeSeatCount(),
+      config: { sb: cfg.sb, bb: cfg.bb, maxSeats: cfg.maxSeats, minSeats: cfg.minSeats, startStack: cfg.startStack, actionTimeoutMs: cfg.actionTimeoutMs },
       status: this.status,
       handNumber: this.handNumber,
       street: h ? h.street : null,

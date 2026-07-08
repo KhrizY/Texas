@@ -277,7 +277,7 @@ function seatPos(offset, total) {
 function renderSeats() {
   const layer = $('seats');
   layer.innerHTML = '';
-  const total = state.config.maxSeats;
+  const total = state.activeSeats || state.config.maxSeats;
   const yourSeat = state.you.seat;
   const seated = yourSeat !== null;
 
