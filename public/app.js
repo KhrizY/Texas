@@ -180,8 +180,28 @@ function cardEl(c, mini) {
 }
 function renderBoard() {
   const box = $('board');
-  box.innerHTML = '';
-  (state.board || []).forEach((c) => box.appendChild(cardEl(c, false)));
+  const curBoard = state.board || [];
+  const prevBoard = prevState ? (prevState.board || []) : [];
+
+  // 新一局 / board 缩容（不应发生）→ 全量重置
+  if (!prevState || prevState.handNumber !== state.handNumber || curBoard.length < prevBoard.length) {
+    box.innerHTML = '';
+    curBoard.forEach(c => box.appendChild(cardEl(c, false)));
+    return;
+  }
+
+  // 无新增牌 → 不动（避免覆盖已渲染的卡片）
+  if (curBoard.length <= prevBoard.length) return;
+
+  // 有新增牌 → 逐张翻牌动画
+  const newCards = curBoard.slice(prevBoard.length);
+  newCards.forEach((card, i) => {
+    setTimeout(() => {
+      const el = cardEl(card, false);
+      el.classList.add('card-flip-in');
+      box.appendChild(el);
+    }, i * 380);
+  });
 }
 
 // 筹码堆元素
@@ -295,17 +315,26 @@ function renderSeats() {
       const empty = document.createElement('div');
       empty.className = 'seat-empty';
       empty.textContent = `坐下 (${s + 1})`;
-      if (!seated && state.status !== 'playing') empty.onclick = () => send({ type: 'sit', seat: s });
-      else { empty.style.opacity = '.5'; empty.style.cursor = 'default'; }
+      const canSit = !seated && state.status !== 'playing';
+      if (canSit) {
+        empty.onclick = () => send({ type: 'sit', seat: s });
+      } else {
+        empty.classList.add('disabled');
+        empty.style.opacity = '.5';
+        if (seated) { empty.title = '你已在座位上，无法移动到其他座位'; }
+        else { empty.title = '本局进行中，结束后才能入座'; }
+        empty.onclick = () => toast(seated ? '你已在座位上' : '本局进行中，结束后才能入座');
+      }
       wrap.appendChild(empty);
     } else {
       wrap.appendChild(playerBox(seatData));
     }
     layer.appendChild(wrap);
 
-    // 下注筹码（位于玩家与底池之间，更靠近中心，避免遮挡卡片）
+    // 下注筹码：紧贴玩家卡片（向桌心微收），随卡片位置同步移动
     if (seatData && seatData.roundBet > 0) {
-      const bp = { x: 50 + (pos.x - 50) * 0.38, y: 50 + (pos.y - 50) * 0.38 };
+      const k = 0.28; // 0=卡片处, 1=桌心；取较小值让筹码贴近卡片，而非漂在中间
+      const bp = { x: pos.x + (50 - pos.x) * k, y: pos.y + (50 - pos.y) * k };
       const bet = document.createElement('div');
       bet.className = 'bet-chips-layer';
       bet.style.left = bp.x + '%';
@@ -528,6 +557,11 @@ function setupActionBar(legal) {
       slider.value = amountToPos(raiseTarget, min, max);
     };
   });
+
+  // +/- 步进按钮：贴合滑块量程，方便微调
+  const step = Math.max(1, Math.round((max - min) / 50));
+  $('raiseMinus').onclick = () => { setTarget(raiseTarget - step); slider.value = amountToPos(raiseTarget, min, max); };
+  $('raisePlus').onclick = () => { setTarget(raiseTarget + step); slider.value = amountToPos(raiseTarget, min, max); };
 }
 
 function renderWinner() {
@@ -552,6 +586,14 @@ function renderLog() {
 }
 
 // ---------- 聊天 ----------
+let unreadChat = 0;
+function updateChatBadge() {
+  const badge = $('chatBadge');
+  if (!badge) return;
+  if (unreadChat <= 0) { badge.classList.add('hidden'); return; }
+  badge.textContent = unreadChat > 99 ? '99+' : String(unreadChat);
+  badge.classList.remove('hidden');
+}
 function appendChat(name, text) {
   const box = $('chatLog');
   if (!box) return;
@@ -568,6 +610,11 @@ function appendChat(name, text) {
   box.appendChild(line);
   while (box.children.length > 120) box.removeChild(box.firstChild);
   box.scrollTop = box.scrollHeight;
+  // 面板未打开时累计未读，显示红点提示
+  if ($('chatPanel').classList.contains('hidden')) {
+    unreadChat++;
+    updateChatBadge();
+  }
 }
 function sendChat() {
   const inp = $('chatText');
@@ -752,7 +799,11 @@ updateSoundButton();
 $('chatBtn').onclick = () => {
   const p = $('chatPanel');
   p.classList.toggle('hidden');
-  if (!p.classList.contains('hidden')) $('chatText').focus();
+  if (!p.classList.contains('hidden')) {
+    $('chatText').focus();
+    unreadChat = 0; // 打开即已读，清除红点
+    updateChatBadge();
+  }
 };
 $('chatClose').onclick = () => $('chatPanel').classList.add('hidden');
 $('chatSend').onclick = sendChat;

@@ -44,7 +44,7 @@
         <button id="zoomIn" class="btn btn-ghost" aria-label="放大">+</button>
       </div>
       <div class="top-actions">
-        <button id="chatBtn" class="btn btn-ghost" title="聊天">💬</button>
+        <button id="chatBtn" class="btn btn-ghost" title="聊天">💬<span id="chatBadge" class="chat-badge hidden">0</span></button>
         <button id="soundBtn" class="btn btn-ghost" title="音效开关">🔊</button>
         <button id="hostBtn" class="btn btn-ghost hidden">🎁 增发</button>
         <button id="autoNextBtn" class="btn btn-ghost hidden">自动下一局：关</button>
@@ -80,7 +80,11 @@
             <button class="chip-btn" data-mul="1">底池</button>
             <button class="chip-btn" data-mul="max">全下</button>
           </div>
-          <button id="raiseBtn" class="btn btn-raise">加注 <span id="raiseAmt">0</span></button>
+          <div class="raise-row">
+            <button id="raiseMinus" class="btn btn-stepper" title="减少">−</button>
+            <button id="raiseBtn" class="btn btn-raise">加注 <span id="raiseAmt">0</span></button>
+            <button id="raisePlus" class="btn btn-stepper" title="增加">+</button>
+          </div>
         </div>
       </div>
       <div id="waitHint" class="wait-hint"></div>
