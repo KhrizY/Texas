@@ -331,9 +331,9 @@ function renderSeats() {
     }
     layer.appendChild(wrap);
 
-    // 下注筹码：紧贴玩家卡片（向桌心微收），随卡片位置同步移动
+    // 下注筹码：卡片与底池中间偏里，不遮挡卡片
     if (seatData && seatData.roundBet > 0) {
-      const k = 0.28; // 0=卡片处, 1=桌心；取较小值让筹码贴近卡片，而非漂在中间
+      const k = 0.55; // 0=卡片处, 1=桌心；过半靠内，避免遮挡卡片
       const bp = { x: pos.x + (50 - pos.x) * k, y: pos.y + (50 - pos.y) * k };
       const bet = document.createElement('div');
       bet.className = 'bet-chips-layer';
