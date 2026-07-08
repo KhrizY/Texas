@@ -250,7 +250,7 @@ function renderPot() {
 // 座位沿胶囊（圆角矩形拉满）周长排布：你的座位在底部正中
 // 以单位 u 计算（桌面 16 x 10），再换算成百分比
 function seatPos(offset, total) {
-  const R = 5, straight = 6;                 // 半圆半径 / 直边长度
+  const R = 4.5, straight = 7;               // 半圆半径 / 直边长度（更扁的 16x9 胶囊）
   const P = 2 * straight + 2 * Math.PI * R;  // 周长
   const d0 = straight + Math.PI * R + straight / 2; // 底中（你的座位）对应弧长
   let d = (d0 + (offset / total) * P) % P;
@@ -269,9 +269,9 @@ function seatPos(offset, total) {
     x = R + R * Math.cos(th); y = R + R * Math.sin(th);
     nx = -Math.cos(th); ny = -Math.sin(th);
   }
-  const m = 1.4;                             // 内缩量（单位 u），让卡片落在台面内、贴近木边
+  const m = -1.4;                            // 统一外推：玩家卡片移到桌面外圈、围绕桌面（不再压在台面上）
   x += nx * m; y += ny * m;
-  return { x: x / 16 * 100, y: y / 10 * 100 };
+  return { x: x / 16 * 100, y: y / 9 * 100 };
 }
 
 function renderSeats() {

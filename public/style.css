@@ -88,10 +88,11 @@ body {
 .top-actions { display: flex; gap: 8px; }
 
 /* ---------- 牌桌 ---------- */
-.table-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px; min-height: 0; }
+.table-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 150px 12px; min-height: 0; }
 .felt {
-  position: relative; width: min(94vw, calc(78vh * 1.6), 900px); aspect-ratio: 16/10;
-  border-radius: 31.25% / 50%;
+  position: relative; height: min(45vh, calc(74vw * 0.5625), 432px); aspect-ratio: 16 / 9;
+  border-radius: 28.125% / 50%;
+  container-type: size;
   background:
     radial-gradient(ellipse at 50% 42%, #1aa377 0%, #0e7a57 46%, #084e38 78%, #042c1f 100%);
   border: 2px solid var(--rail-edge);
@@ -106,7 +107,7 @@ body {
 /* 内侧下注线 + 中央水印，营造赌场牌桌质感 */
 .felt::before {
   content: ''; position: absolute; inset: 7%;
-  border-radius: 24% / 43%;
+  border-radius: 20% / 43%;
   border: 2px solid rgba(245,197,66,.30);
   box-shadow: inset 0 0 50px rgba(0,0,0,.30);
   pointer-events: none; z-index: 0;
@@ -150,15 +151,15 @@ body {
   background: repeating-linear-gradient(45deg, #3f5c8a, #3f5c8a 6px, #34497099 6px, #344970 12px);
   border: 2px solid #29405f;
 }
-.card.mini { width: 30px; height: 42px; padding: 3px; }
-.card.mini .r { font-size: 12px; }
-.card.mini .s { font-size: 11px; }
+.card.mini { width: 4.4cqw; height: 6.2cqw; padding: 0.45cqw; }
+.card.mini .r { font-size: 1.75cqw; }
+.card.mini .s { font-size: 1.65cqw; }
 
 /* ---------- 座位 ---------- */
 #seats { position: absolute; inset: 0; z-index: 1; }
 .seat {
   position: absolute; transform: translate(-50%, -50%);
-  width: 128px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: clamp(80px, 15.4cqw, 146px); display: flex; flex-direction: column; align-items: center; gap: 0.55cqw;
 }
 .seat-empty {
   width: 90px; height: 62px; border: 2px dashed rgba(255,255,255,.28);
@@ -169,30 +170,30 @@ body {
 .player-box {
   position: relative; background: linear-gradient(180deg, #20283400, #161c25);
   background-color: #1a212c; border: 1px solid rgba(245,197,66,.20);
-  border-radius: 14px; padding: 8px 10px; width: 128px; text-align: center;
+  border-radius: 2.0cqw; padding: 1.0cqw 1.2cqw; width: clamp(80px, 15.4cqw, 146px); text-align: center;
   box-shadow: 0 4px 14px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
   overflow: visible;
 }
 .player-box.actor { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(245,197,66,.30), 0 6px 18px rgba(0,0,0,.5); }
 .player-box.folded { opacity: .45; }
 .player-box.winner { border-color: var(--gold); animation: winPulse 1s ease infinite; }
-.player-info { display: grid; grid-template-columns: 28px 1fr; align-items: center; gap: 6px; margin-top: 2px; }
+.player-info { display: grid; grid-template-columns: 3.5cqw 1fr; align-items: center; gap: 0.8cqw; margin-top: 0.35cqw; }
 .avatar {
-  width: 28px; height: 28px; border-radius: 50%;
+  width: 3.5cqw; height: 3.5cqw; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: linear-gradient(135deg, #4c8bf5, #7a5cf5); color: #fff;
-  font-weight: 900; font-size: 14px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.18);
+  font-weight: 900; font-size: 1.9cqw; box-shadow: inset 0 0 0 2px rgba(255,255,255,.18);
 }
 .player-text { min-width: 0; text-align: left; }
 /* 玩家筹码堆放在卡片右侧，不遮挡 */
 .wallet-side {
-  position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%);
+  position: absolute; left: calc(100% + 1.0cqw); top: 50%; transform: translateY(-50%);
   z-index: 3; pointer-events: none; filter: drop-shadow(0 2px 5px rgba(0,0,0,.4));
 }
 .wallet-side .chip-amt { display: none; }
 
-.pname { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pstack { font-size: 12px; color: var(--gold); font-weight: 700; }
+.pname { font-size: 1.75cqw; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pstack { font-size: 1.65cqw; color: var(--gold); font-weight: 700; }
 .pbadges { display: flex; gap: 3px; justify-content: center; margin-top: 4px; min-height: 15px; flex-wrap: wrap; }
 
 .badge { font-size: 10px; padding: 1px 5px; border-radius: 6px; font-weight: 700; line-height: 1.25; }
@@ -205,7 +206,7 @@ body {
 .badge.allin { background: linear-gradient(135deg, #e0524a, #ff9f43); color: #fff; letter-spacing: .4px; box-shadow: 0 0 10px rgba(224,82,74,.55); }
 .badge.out { background: #555; }
 
-.hole-cards { display: flex; gap: 3px; justify-content: center; margin-bottom: 4px; height: 42px; }
+.hole-cards { display: flex; gap: 0.45cqw; justify-content: center; margin-bottom: 0.55cqw; height: 6.2cqw; }
 .timer-ring {
   position: absolute; inset: -5px; border-radius: 18px; pointer-events: none;
   opacity: .98;
@@ -324,10 +325,12 @@ body {
   .status-label { order: 2; font-size: 12px; }
   .top-actions { order: 3; margin-left: auto; }
   .top-actions .btn { padding: 7px 11px; font-size: 14px; }
+  .table-wrap { padding: 84px 8px 84px; }
 
   /* 手机上收敛木边宽度，避免横向溢出被裁切 */
   .felt {
-    width: min(92vw, calc(74vh * 1.6), 900px);
+    height: min(40vh, calc(94vw * 0.5625), 384px);
+    width: auto;
     box-shadow:
       inset 0 0 60px rgba(0,0,0,.55),
       0 0 0 7px var(--rail),
@@ -339,7 +342,7 @@ body {
   .card { width: 38px; height: 54px; }
   .card .r { font-size: 13px; }
   .card .s { font-size: 12px; }
-  .seat, .player-box { width: 100px; }
+  .seat, .player-box { width: clamp(76px, 18cqw, 104px); }
   .player-box { padding: 6px 7px; }
   .player-info { grid-template-columns: 22px 1fr; gap: 4px; }
   .avatar { width: 22px; height: 22px; font-size: 11px; }
@@ -372,7 +375,7 @@ body {
 @media (max-width: 380px) {
   .card { width: 32px; height: 46px; }
   .card .r { font-size: 11px; }
-  .seat, .player-box { width: 88px; }
+  .seat, .player-box { width: clamp(70px, 20cqw, 92px); }
   .player-box { padding: 5px 6px; }
   .pname { font-size: 10px; }
   .hole-cards .card.mini { width: 22px; height: 32px; }
@@ -381,7 +384,7 @@ body {
 
 /* 横屏矮屏：进一步压缩牌桌，避免纵向溢出 */
 @media (max-height: 480px) and (orientation: landscape) {
-  .felt { width: min(82vw, calc(86vh * 1.6), 900px); }
+  .felt { height: min(51vh, calc(94vw * 0.5625), 336px); width: auto; }
   .log-box { display: none; }
   .controls { padding: 6px 10px; }
 }
