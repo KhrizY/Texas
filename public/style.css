@@ -395,9 +395,18 @@ body {
   .board .card { width: 32px; height: 46px; }
 }
 
-/* 横屏矮屏：进一步压缩牌桌，避免纵向溢出 */
-@media (max-height: 480px) and (orientation: landscape) {
-  .felt { height: min(51vh, calc(94vw * 0.5625), 336px); width: auto; }
+/* 横屏（手机 / 矮窗口）：高度受限，改为以高度驱动牌桌并收紧上下留白
+   注意：横屏时手机宽度往往 >640px，不会命中 640px 断点，因此这里必须单独处理 .table-wrap 的留白，
+   否则沿用桌面 150px 上下 padding 会把牌桌挤得只剩一条、被 overflow:hidden 裁掉。 */
+@media (orientation: landscape) and (max-height: 560px) {
+  .topbar { padding: 6px 12px; }
+  .table-wrap { padding: 48px 36px; }
+  .felt {
+    height: min(44vh, calc(82vw * 0.5625), 300px);
+    width: auto;
+  }
   .log-box { display: none; }
-  .controls { padding: 6px 10px; }
+  .controls { padding: 6px 10px; min-height: 0; }
+  .board { min-height: 48px; }
+  .board .card { width: 34px; height: 48px; }
 }
