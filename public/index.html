@@ -38,6 +38,11 @@
     <header class="topbar">
       <div class="room-info">房间 <b id="roomLabel"></b> · 盲注 <b id="blindLabel"></b></div>
       <div id="statusLabel" class="status-label">等待中</div>
+      <div class="zoom-ctrl" title="缩放牌桌">
+        <button id="zoomOut" class="btn btn-ghost" aria-label="缩小">−</button>
+        <span id="zoomVal">100%</span>
+        <button id="zoomIn" class="btn btn-ghost" aria-label="放大">+</button>
+      </div>
       <div class="top-actions">
         <button id="chatBtn" class="btn btn-ghost" title="聊天">💬</button>
         <button id="soundBtn" class="btn btn-ghost" title="音效开关">🔊</button>
@@ -48,7 +53,7 @@
     </header>
 
     <div class="table-wrap">
-      <div class="felt">
+      <div id="felt" class="felt">
         <div class="table-center">
           <div id="board" class="board"></div>
           <div id="potBox" class="pot-box hidden"><span class="pot-label">底池</span> <span id="potAmt">0</span></div>

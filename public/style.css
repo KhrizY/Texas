@@ -87,8 +87,20 @@ body {
 .status-label { font-size: 13px; color: var(--gold); font-weight: 600; }
 .top-actions { display: flex; gap: 8px; }
 
+/* 缩放控件 */
+.zoom-ctrl {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 3px 6px;
+}
+.zoom-ctrl .btn { padding: 4px 10px; font-size: 16px; line-height: 1; min-width: 30px; }
+.zoom-ctrl #zoomVal {
+  font-size: 13px; color: var(--text); min-width: 44px; text-align: center;
+  font-variant-numeric: tabular-nums; user-select: none;
+}
+
 /* ---------- 牌桌 ---------- */
-.table-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 150px 12px; min-height: 0; }
+.table-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 150px 12px; min-height: 0; overflow: hidden; transform-origin: center center; }
 .felt {
   position: relative; height: min(45vh, calc(74vw * 0.5625), 432px); aspect-ratio: 16 / 9;
   border-radius: 28.125% / 50%;
@@ -325,6 +337,7 @@ body {
   .status-label { order: 2; font-size: 12px; }
   .top-actions { order: 3; margin-left: auto; }
   .top-actions .btn { padding: 7px 11px; font-size: 14px; }
+  .zoom-ctrl { order: 4; }
   .table-wrap { padding: 84px 8px 84px; }
 
   /* 手机上收敛木边宽度，避免横向溢出被裁切 */

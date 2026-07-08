@@ -764,3 +764,49 @@ $('nextBtn').onclick = () => send({ type: 'next' });
 $('leaveBtn').onclick = () => { myRoom = ''; if (ws) { try { ws.close(); } catch {} } location.reload(); };
 $('room').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('enterBtn').click(); });
 $('pwd').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('enterBtn').click(); });
+
+// ---------- 牌桌缩放（桌面 / 手机通用） ----------
+// 通过 transform: scale() 缩放牌桌主体 .felt，座位与卡牌随容器等比缩放；
+// 飞行筹码动画使用 getBoundingClientRect，会因 transform 自动对齐，无需额外处理。
+(function setupZoom() {
+  const felt = document.getElementById('felt');
+  const zoomVal = document.getElementById('zoomVal');
+  const zoomIn = document.getElementById('zoomIn');
+  const zoomOut = document.getElementById('zoomOut');
+  if (!felt || !zoomVal || !zoomIn || !zoomOut) return;
+
+  const MIN = 0.6, MAX = 1.4, STEP = 0.1;
+  const clamp = (z) => Math.min(MAX, Math.max(MIN, Math.round(z * 10) / 10));
+
+  let zoom = clamp(parseFloat(localStorage.getItem('poker_zoom')) || 1);
+  const apply = () => {
+    felt.style.transform = 'scale(' + zoom + ')';
+    zoomVal.textContent = Math.round(zoom * 100) + '%';
+    localStorage.setItem('poker_zoom', String(zoom));
+  };
+  const change = (d) => { zoom = clamp(zoom + d); apply(); };
+
+  zoomIn.onclick = () => change(STEP);
+  zoomOut.onclick = () => change(-STEP);
+
+  // 触控板双指捏合（桌面 Chrome/Safari 以 wheel + ctrlKey 表达）
+  felt.addEventListener('wheel', (e) => {
+    if (e.ctrlKey) { e.preventDefault(); change(e.deltaY < 0 ? STEP : -STEP); }
+  }, { passive: false });
+
+  // 手机双指捏合缩放
+  let pinchStart = 0, pinchBase = 1;
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  felt.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) { pinchStart = dist(e.touches); pinchBase = zoom; }
+  }, { passive: true });
+  felt.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && pinchStart) {
+      zoom = clamp(pinchBase * dist(e.touches) / pinchStart);
+      apply();
+    }
+  }, { passive: true });
+  felt.addEventListener('touchend', () => { pinchStart = 0; }, { passive: true });
+
+  apply();
+})();
