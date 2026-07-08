@@ -405,6 +405,30 @@ function decideBotAction(game, seat) {
   return { action: 'fold' };
 }
 
+//  根据行动和局势选择表情，增加互动感（供 game.js 调用）
+function botReaction(action, game, seat) {
+  if (Math.random() > 0.18) return null; // 82% 不发表情，减少频率
+  const h = game.hand;
+  const p = game.players.get(game.seats[seat]);
+  const profile = p ? p.botProfile || {} : {};
+  const prng = Math.random();
+  if (action === 'fold') {
+    if (prng < 0.4) return '😬'; else if (prng < 0.7) return '🤔'; else return '💨';
+  }
+  if (action === 'check') {
+    if (prng < 0.3) return '😴'; else if (prng < 0.6) return '😏'; else return null;
+  }
+  if (action === 'call') {
+    if (prng < 0.35) return '😊'; else if (prng < 0.6) return '🤞'; else return null;
+  }
+  if (action === 'bet' || action === 'raise') {
+    const isBluff = (profile.bluff || 1) > 1.2 && prng < 0.4;
+    if (isBluff) return prng < 0.5 ? '😈' : '👀';
+    if (prng < 0.3) return '💪'; else if (prng < 0.55) return '🔥'; else if (prng < 0.75) return '😎'; else return '🎯';
+  }
+  return null;
+}
+
 // ========================= 对手追踪更新 =========================
 function trackAction(game, seat, action, amount) {
   if (!game._botStats) game._botStats = {};
@@ -447,4 +471,4 @@ function trackAction(game, seat, action, amount) {
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-module.exports = { decideBotAction, estimateStrength, trackAction, classifyBoard, initOppStats };
+module.exports = { decideBotAction, estimateStrength, trackAction, classifyBoard, initOppStats, botReaction };

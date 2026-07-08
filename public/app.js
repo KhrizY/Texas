@@ -140,12 +140,18 @@ function handle(msg) {
   }
   if (msg.type === 'error') { toast(msg.msg); return; }
   if (msg.type === 'chat') { appendChat(msg.name, msg.text); return; }
+  if (msg.type === 'react') { showEmoji(msg.seat, msg.emoji); return; }
   if (msg.type === 'state') {
     prevState = state;
     state = msg;
     render();
     runAnimations();
     runSounds();
+    // 机器人表情反应：用 ts 去重，防止重复渲染触发两次
+    if (msg.botReact && msg.botReact.ts !== _lastBotReactTS) {
+      _lastBotReactTS = msg.botReact.ts;
+      showEmoji(msg.botReact.seat, msg.botReact.emoji);
+    }
   }
 }
 
@@ -354,6 +360,16 @@ function playerBox(p) {
   const isWinner = state.winners && state.winners.some((w) => w.seat === p.seat && w.amount > 0);
   if (state.status === 'showdown' && isWinner) box.classList.add('winner');
   box.dataset.seat = p.seat;
+
+  // 自己的卡片右上角放表情按钮
+  if (p.isYou) {
+    const trigger = document.createElement('button');
+    trigger.className = 'react-trigger';
+    trigger.textContent = '😊';
+    trigger.title = '表情';
+    trigger.onclick = (e) => { e.stopPropagation(); toggleEmojiPicker(trigger, p.seat); };
+    box.appendChild(trigger);
+  }
 
   if (p.hasCards && !p.folded) {
     const hc = document.createElement('div');
@@ -808,6 +824,67 @@ $('chatBtn').onclick = () => {
 $('chatClose').onclick = () => $('chatPanel').classList.add('hidden');
 $('chatSend').onclick = sendChat;
 $('chatText').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
+
+// 实时表情
+const EMOJIS = ['👏', '👍', '😂', '😡', '😲', '🤔', '💪', '🔥', '😭'];
+let _activePicker = null;
+let _lastBotReactTS = 0;
+
+function toggleEmojiPicker(trigger, seat) {
+  // 已打开则关闭
+  if (_activePicker) {
+    _activePicker.remove();
+    _activePicker = null;
+    if (_activePicker === trigger._picker) return; // 已关闭自己
+  }
+  // 新建选择器
+  const picker = document.createElement('div');
+  picker.className = 'react-picker';
+  EMOJIS.forEach(e => {
+    const btn = document.createElement('button');
+    btn.className = 'emoji-btn';
+    btn.textContent = e;
+    btn.onclick = (ev) => { ev.stopPropagation(); sendEmoji(seat, e); picker.remove(); _activePicker = null; };
+    picker.appendChild(btn);
+  });
+  trigger.appendChild(picker);
+  trigger._picker = picker;
+  _activePicker = picker;
+}
+
+function sendEmoji(seat, emoji) {
+  if (!myId || !ws || ws.readyState !== WebSocket.OPEN) return;
+  send({ type: 'react', emoji });
+  showEmoji(seat, emoji);
+}
+
+// 点击空白关闭选择器
+document.addEventListener('click', (e) => {
+  if (!_activePicker) return;
+  if (!e.target.closest('.react-picker') && !e.target.closest('.react-trigger')) {
+    _activePicker.remove();
+    _activePicker = null;
+  }
+});
+
+function showEmoji(seat, emoji) {
+  if (!emoji) return;
+  let target;
+  if (seat !== null && seat >= 0) {
+    target = document.querySelector(`.player-box[data-seat="${seat}"]`);
+  }
+  if (!target) {
+    target = document.querySelector('.felt') || document.body;
+  }
+  const rect = target.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'emoji-float';
+  el.textContent = emoji;
+  el.style.left = (rect.left + rect.width / 2 - 18) + 'px';
+  el.style.top = (rect.top - 10) + 'px';
+  $('emojiLayer').appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
 
 $('autoNextBtn').onclick = () => send({ type: 'setAutoNext', enabled: !(state && state.autoNext) });
 $('startBtn').onclick = () => send({ type: 'start' });

@@ -36,27 +36,27 @@
       "profile": { "tight": 0.185, "aggression": 1.592, "bluff": 1.607, "call": 0.796, "allin": 0.524 }
     },
     {
-      "name": "多洛莉丝",
+      "name": "Doloris",
       "style": "松凶主唱",
       "profile": { "tight": 0.173, "aggression": 1.595, "bluff": 1.671, "call": 0.706, "allin": 0.561 }
     },
     {
-      "name": "墨提斯",
+      "name": "Mortis",
       "style": "冷静侵略",
       "profile": { "tight": 0.195, "aggression": 1.616, "bluff": 1.004, "call": 0.781, "allin": 0.575 }
     },
     {
-      "name": "提摩利斯",
+      "name": "Timoris",
       "style": "跟注观察",
       "profile": { "tight": 0.137, "aggression": 1.484, "bluff": 1.529, "call": 0.737, "allin": 0.565 }
     },
     {
-      "name": "阿莫里斯",
+      "name": "Amoris",
       "style": "情绪诈唬",
       "profile": { "tight": 0.156, "aggression": 1.700, "bluff": 1.597, "call": 0.796, "allin": 0.623 }
     },
     {
-      "name": "欧布利维奥尼斯",
+      "name": "Oblivionis",
       "style": "超紧强攻",
       "profile": { "tight": 0.185, "aggression": 1.476, "bluff": 1.373, "call": 0.843, "allin": 0.467 }
     },

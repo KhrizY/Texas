@@ -134,6 +134,18 @@ wss.on('connection', (ws) => {
         }
         return;
       }
+      case 'react': {
+        const pp2 = room.game.players.get(ws.playerId);
+        const emoji = String(msg.emoji || '').slice(0, 8);
+        if (!pp2 || pp2.seat === null || !emoji) return;
+        const payload = JSON.stringify({ type: 'react', seat: pp2.seat, emoji });
+        for (const [, cws] of room.clients) {
+          if (cws.readyState === cws.OPEN) {
+            try { cws.send(payload); } catch { /* ignore */ }
+          }
+        }
+        return;
+      }
       default: res = { error: '未知指令' };
     }
     if (res && res.error) send(ws, { type: 'error', msg: res.error });
