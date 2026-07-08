@@ -1,8 +1,10 @@
 'use strict';
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { newShuffledDeck } = require('./deck');
 const { bestOf, cmp, CATEGORY_NAMES } = require('./evaluator');
-const { decideBotAction } = require('./bot');
+const { decideBotAction, trackAction } = require('./bot');
 
 const STREETS = ['preflop', 'flop', 'turn', 'river', 'showdown'];
 
@@ -33,6 +35,9 @@ class Game {
     this._runoutTimers = [];
     this.autoNext = false;
     this.onChange = opts.onChange || (() => {});
+    // 机器人对手追踪 & 多街计划
+    this._botStats = {};
+    this._botPlans = {};
   }
 
   _log(text) {
@@ -105,20 +110,7 @@ class Game {
     if (byId && byId !== this.hostId) return { error: '只有房主可以添加机器人' };
     const emptySeat = this.seats.findIndex((x) => !x);
     if (emptySeat < 0) return { error: '座位已满' };
-    const botCatalog = [
-      { name: '高松灯', style: '迷子主唱', profile: { tight: 0.02, aggression: 1.05, bluff: 0.8, call: 1.15, allin: 0.7 } },
-      { name: '千早爱音', style: '松凶吉他', profile: { tight: -0.05, aggression: 1.35, bluff: 1.35, call: 1.05, allin: 0.55 } },
-      { name: '要乐奈', style: '野性攻击', profile: { tight: -0.08, aggression: 1.45, bluff: 1.15, call: 0.95, allin: 0.65 } },
-      { name: '长崎爽世', style: '稳健控池', profile: { tight: 0.06, aggression: 0.95, bluff: 0.75, call: 1.0, allin: 0.45 } },
-      { name: '椎名立希', style: '紧凶鼓手', profile: { tight: 0.10, aggression: 1.28, bluff: 0.65, call: 0.82, allin: 0.55 } },
-      { name: '多洛莉丝', style: '松凶主唱', profile: { tight: -0.06, aggression: 1.38, bluff: 1.45, call: 1.0, allin: 0.5 } },
-      { name: '墨提斯', style: '冷静侵略', profile: { tight: 0.02, aggression: 1.32, bluff: 1.05, call: 0.92, allin: 0.45 } },
-      { name: '提摩利斯', style: '跟注观察', profile: { tight: 0.04, aggression: 0.92, bluff: 0.85, call: 1.35, allin: 0.35 } },
-      { name: '阿莫里斯', style: '情绪诈唬', profile: { tight: -0.03, aggression: 1.22, bluff: 1.55, call: 1.05, allin: 0.5 } },
-      { name: '欧布利维奥尼斯', style: '超紧强攻', profile: { tight: 0.14, aggression: 1.4, bluff: 0.45, call: 0.75, allin: 0.5 } },
-      { name: '若叶睦', style: '沉默强牌', profile: { tight: 0.09, aggression: 1.18, bluff: 0.55, call: 0.9, allin: 0.45 } },
-      { name: '丰川祥子', style: '压迫控场', profile: { tight: 0.03, aggression: 1.5, bluff: 1.0, call: 0.85, allin: 0.5 } },
-    ];
+    const botCatalog = getBotCatalog();
     const used = new Set([...this.players.values()].map((p) => p.name));
     const unused = botCatalog.filter((x) => !used.has(x.name));
     const pool = unused.length ? unused : botCatalog;
@@ -126,7 +118,7 @@ class Game {
     const name = entry.name;
     const id = 'bot' + crypto.randomBytes(8).toString('hex');
     const bot = this.addPlayer(id, name, { isBot: true });
-    bot.botStyle = entry.style;
+    bot.botStyle = entry.style || '自学习风格';
     bot.botProfile = entry.profile;
     const res = this.sit(id, emptySeat);
     if (res.error) return res;
@@ -291,6 +283,7 @@ class Game {
       minRaise: this.config.bb,
       actor: null,
       deadline: 0,
+      lastAggressor: null,
       winners: null,
       revealed: false,
     };
@@ -359,7 +352,13 @@ class Game {
       return { error: '未知动作' };
     }
 
+    if (action === 'raise' || action === 'bet') {
+      this.hand.lastAggressor = seat;
+    }
+
     this._afterAction(seat);
+    // 记录对手数据供机器人分析
+    trackAction(this, seat, action, amount || 0);
     return { ok: true };
   }
 
@@ -761,6 +760,46 @@ class Game {
       seatedCount: this._seatedActive().length,
     };
   }
+}
+
+// 尝试加载自学习训练结果（若存在 data/bot-profiles.json 则优先使用）
+function loadTrainedProfiles() {
+  try {
+    const p = path.join(__dirname, '..', 'data', 'bot-profiles.json');
+    if (fs.existsSync(p)) {
+      const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+      if (raw && raw.profiles && raw.profiles.length) {
+        return raw.profiles;
+      }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+// 默认 bot 角色（未训练时的后备）
+const DEFAULT_BOT_CATALOG = [
+  { name: '高松灯', style: '迷子主唱', profile: { tight: 0.02, aggression: 1.05, bluff: 0.8, call: 1.15, allin: 0.7 } },
+  { name: '千早爱音', style: '松凶吉他', profile: { tight: -0.05, aggression: 1.35, bluff: 1.35, call: 1.05, allin: 0.55 } },
+  { name: '要乐奈', style: '野性攻击', profile: { tight: -0.08, aggression: 1.45, bluff: 1.15, call: 0.95, allin: 0.65 } },
+  { name: '长崎爽世', style: '稳健控池', profile: { tight: 0.06, aggression: 0.95, bluff: 0.75, call: 1.0, allin: 0.45 } },
+  { name: '椎名立希', style: '紧凶鼓手', profile: { tight: 0.10, aggression: 1.28, bluff: 0.65, call: 0.82, allin: 0.55 } },
+  { name: '多洛莉丝', style: '松凶主唱', profile: { tight: -0.06, aggression: 1.38, bluff: 1.45, call: 1.0, allin: 0.5 } },
+  { name: '墨提斯', style: '冷静侵略', profile: { tight: 0.02, aggression: 1.32, bluff: 1.05, call: 0.92, allin: 0.45 } },
+  { name: '提摩利斯', style: '跟注观察', profile: { tight: 0.04, aggression: 0.92, bluff: 0.85, call: 1.35, allin: 0.35 } },
+  { name: '阿莫里斯', style: '情绪诈唬', profile: { tight: -0.03, aggression: 1.22, bluff: 1.55, call: 1.05, allin: 0.5 } },
+  { name: '欧布利维奥尼斯', style: '超紧强攻', profile: { tight: 0.14, aggression: 1.4, bluff: 0.45, call: 0.75, allin: 0.5 } },
+  { name: '若叶睦', style: '沉默强牌', profile: { tight: 0.09, aggression: 1.18, bluff: 0.55, call: 0.9, allin: 0.45 } },
+  { name: '丰川祥子', style: '压迫控场', profile: { tight: 0.03, aggression: 1.5, bluff: 1.0, call: 0.85, allin: 0.5 } },
+];
+
+// 懒加载：首次使用时决定用训练结果还是默认值
+let _botCatalogCache = null;
+function getBotCatalog() {
+  if (_botCatalogCache) return _botCatalogCache;
+  const trained = loadTrainedProfiles();
+  _botCatalogCache = trained || DEFAULT_BOT_CATALOG;
+  if (trained) console.log(`[bot] 加载自学习训练结果（${trained.length} 个 profile）`);
+  return _botCatalogCache;
 }
 
 // ---------- 工具函数 ----------
