@@ -337,9 +337,10 @@ function renderSeats() {
     }
     layer.appendChild(wrap);
 
-    // 下注筹码：卡片与底池中间偏里，不遮挡卡片
+    // 下注筹码：自适应位置——侧位靠外不挡公共牌，上下位靠内不挡卡
     if (seatData && seatData.roundBet > 0) {
-      const k = 0.55; // 0=卡片处, 1=桌心；过半靠内，避免遮挡卡片
+      const xDistFromCenter = Math.abs(pos.x - 50) / 50; // 0=上下, 1=左右侧
+      const k = 0.30 + (1 - xDistFromCenter) * 0.30;     // 侧位0.30, 上下位0.60
       const bp = { x: pos.x + (50 - pos.x) * k, y: pos.y + (50 - pos.y) * k };
       const bet = document.createElement('div');
       bet.className = 'bet-chips-layer';

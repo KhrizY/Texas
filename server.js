@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { WebSocketServer } = require('ws');
 const { Game } = require('./src/game');
+const { onlineLearn } = require('./src/learn-online');
 
 const app = express();
 app.get('/favicon.ico', (req, res) => res.status(204).end());
@@ -36,7 +37,7 @@ function getRoom(roomId) {
   let room = rooms.get(roomId);
   if (!room) {
     room = { game: null, clients: new Map() };
-    room.game = new Game(roomId, { onChange: () => broadcast(roomId) });
+    room.game = new Game(roomId, { onChange: () => broadcast(roomId), animateTransitions: true });
     rooms.set(roomId, room);
   }
   return room;
@@ -157,8 +158,16 @@ wss.on('connection', (ws) => {
       if (room && room.clients.get(ws.playerId) === ws) {
         room.clients.delete(ws.playerId);
         room.game.disconnect(ws.playerId);
-        // 房间空了则回收
+        // 房间空了则回收；同时触发线上学习
         if (room.clients.size === 0) {
+          // 真人走光了，拿本场数据微调 AI
+          if (room.game._learnLog && room.game._learnLog.length >= 10) {
+            const result = onlineLearn(room.game._learnLog);
+            if (result.updated > 0) {
+              console.log(`[learn] 房间 ${ws.roomId}：${result.msg}（${room.game._learnLog.length} 个样本）`);
+              room.game._learnLog = [];
+            }
+          }
           setTimeout(() => {
             const r = rooms.get(ws.roomId);
             if (r && r.clients.size === 0) rooms.delete(ws.roomId);

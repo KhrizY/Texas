@@ -5,6 +5,7 @@ const path = require('path');
 const { newShuffledDeck } = require('./deck');
 const { bestOf, cmp, CATEGORY_NAMES } = require('./evaluator');
 const { decideBotAction, trackAction, botReaction } = require('./bot');
+const { recordSample, finalizeHandSamples } = require('./learn-online');
 
 const STREETS = ['preflop', 'flop', 'turn', 'river', 'showdown'];
 
@@ -34,11 +35,15 @@ class Game {
     this._autoNextTimer = null;
     this._runoutTimers = [];
     this.autoNext = false;
+    this.animateTransitions = opts.animateTransitions === true; // 人类对局时启用发牌停顿动画
     this.onChange = opts.onChange || (() => {});
     // 机器人对手追踪 & 多街计划
     this._botStats = {};
     this._botPlans = {};
     this._lastBotReaction = null;
+    // 线上学习样本
+    this._learnSamples = [];
+    this._learnLog = [];
   }
 
   _log(text) {
@@ -381,8 +386,9 @@ class Game {
     }
 
     this._afterAction(seat);
-    // 记录对手数据供机器人分析
+    // 记录对手数据 + 线上学习样本
     trackAction(this, seat, action, amount || 0);
+    recordSample(this, seat, action, amount || 0);
     return { ok: true };
   }
 
@@ -440,8 +446,15 @@ class Game {
       this._changed();
       return;
     }
-    // 本轮结束
-    this._endStreet();
+    // 本轮结束：如果有人类在线，先清 actor 广播停顿再发牌
+    this.hand.actor = null;
+    this._changed();
+    const hasHuman = this.animateTransitions && [...this.players.values()].some(p => !p.isBot && p.connected);
+    if (hasHuman) {
+      this._timer = setTimeout(() => this._endStreet(), 700);
+    } else {
+      this._endStreet();
+    }
   }
 
   _nextActor(from) {
@@ -667,6 +680,8 @@ class Game {
     }
     // 本局结束：释放掉线玩家的座位，房间状态刷新
     this._cleanupDisconnected();
+    // 线上学习：局末对样本打分并存入学习日志
+    finalizeHandSamples(this);
     this._changed();
     this._scheduleAutoNext();
   }

@@ -1,94 +1,183 @@
 {
-  "trained": "2026-07-08T14:46:43.990Z",
-  "numHands": 10000,
-  "generations": 120,
-  "bestProfile": {
-    "tight": 0.039,
-    "aggression": 1.449,
-    "bluff": 1.096,
-    "call": 0.914,
-    "allin": 0.502
-  },
+  "trained": "2026-07-09T02:26:22.524Z",
+  "method": "online-learn",
+  "numHands": 190,
   "profiles": [
     {
       "name": "高松灯",
       "style": "迷子主唱",
-      "profile": { "tight": 0.141, "aggression": 1.527, "bluff": 1.352, "call": 0.746, "allin": 0.555 }
+      "profile": {
+        "tight": 0.141,
+        "aggression": 1.537,
+        "bluff": 1.355,
+        "call": 0.746,
+        "allin": 0.555
+      }
     },
     {
       "name": "千早爱音",
       "style": "松凶吉他",
-      "profile": { "tight": 0.178, "aggression": 1.499, "bluff": 1.387, "call": 0.776, "allin": 0.584 }
+      "profile": {
+        "tight": 0.178,
+        "aggression": 1.499,
+        "bluff": 1.387,
+        "call": 0.776,
+        "allin": 0.584
+      }
     },
     {
       "name": "要乐奈",
       "style": "野性攻击",
-      "profile": { "tight": 0.167, "aggression": 1.564, "bluff": 1.044, "call": 0.794, "allin": 0.632 }
+      "profile": {
+        "tight": 0.167,
+        "aggression": 1.564,
+        "bluff": 1.044,
+        "call": 0.794,
+        "allin": 0.632
+      }
     },
     {
       "name": "长崎爽世",
       "style": "稳健控池",
-      "profile": { "tight": 0.194, "aggression": 1.646, "bluff": 1.742, "call": 0.824, "allin": 0.454 }
+      "profile": {
+        "tight": 0.194,
+        "aggression": 1.646,
+        "bluff": 1.742,
+        "call": 0.824,
+        "allin": 0.454
+      }
     },
     {
       "name": "椎名立希",
       "style": "紧凶鼓手",
-      "profile": { "tight": 0.185, "aggression": 1.592, "bluff": 1.607, "call": 0.796, "allin": 0.524 }
+      "profile": {
+        "tight": 0.185,
+        "aggression": 1.592,
+        "bluff": 1.607,
+        "call": 0.796,
+        "allin": 0.524
+      }
     },
     {
       "name": "Doloris",
       "style": "松凶主唱",
-      "profile": { "tight": 0.173, "aggression": 1.595, "bluff": 1.671, "call": 0.706, "allin": 0.561 }
+      "profile": {
+        "tight": 0.173,
+        "aggression": 1.595,
+        "bluff": 1.671,
+        "call": 0.706,
+        "allin": 0.561
+      }
     },
     {
       "name": "Mortis",
       "style": "冷静侵略",
-      "profile": { "tight": 0.195, "aggression": 1.616, "bluff": 1.004, "call": 0.781, "allin": 0.575 }
+      "profile": {
+        "tight": 0.195,
+        "aggression": 1.6260000000000001,
+        "bluff": 1.007,
+        "call": 0.781,
+        "allin": 0.575
+      }
     },
     {
       "name": "Timoris",
       "style": "跟注观察",
-      "profile": { "tight": 0.137, "aggression": 1.484, "bluff": 1.529, "call": 0.737, "allin": 0.565 }
+      "profile": {
+        "tight": 0.137,
+        "aggression": 1.484,
+        "bluff": 1.529,
+        "call": 0.737,
+        "allin": 0.565
+      }
     },
     {
       "name": "Amoris",
       "style": "情绪诈唬",
-      "profile": { "tight": 0.156, "aggression": 1.700, "bluff": 1.597, "call": 0.796, "allin": 0.623 }
+      "profile": {
+        "tight": 0.156,
+        "aggression": 1.7,
+        "bluff": 1.597,
+        "call": 0.796,
+        "allin": 0.623
+      }
     },
     {
       "name": "Oblivionis",
       "style": "超紧强攻",
-      "profile": { "tight": 0.185, "aggression": 1.476, "bluff": 1.373, "call": 0.843, "allin": 0.467 }
+      "profile": {
+        "tight": 0.185,
+        "aggression": 1.476,
+        "bluff": 1.373,
+        "call": 0.843,
+        "allin": 0.467
+      }
     },
     {
       "name": "若叶睦",
       "style": "沉默强牌",
-      "profile": { "tight": 0.175, "aggression": 1.460, "bluff": 1.066, "call": 0.820, "allin": 0.600 }
+      "profile": {
+        "tight": 0.175,
+        "aggression": 1.46,
+        "bluff": 1.066,
+        "call": 0.82,
+        "allin": 0.6
+      }
     },
     {
       "name": "丰川祥子",
       "style": "压迫控场",
-      "profile": { "tight": 0.172, "aggression": 1.540, "bluff": 1.650, "call": 0.768, "allin": 0.569 }
+      "profile": {
+        "tight": 0.172,
+        "aggression": 1.54,
+        "bluff": 1.65,
+        "call": 0.768,
+        "allin": 0.569
+      }
     },
     {
       "name": "八幡海铃",
       "style": "统御铁壁",
-      "profile": { "tight": 0.195, "aggression": 1.700, "bluff": 1.495, "call": 0.663, "allin": 0.494 }
+      "profile": {
+        "tight": 0.195,
+        "aggression": 1.7,
+        "bluff": 1.495,
+        "call": 0.663,
+        "allin": 0.494
+      }
     },
     {
       "name": "三角初华",
       "style": "偶像欺敌",
-      "profile": { "tight": 0.193, "aggression": 1.530, "bluff": 1.174, "call": 0.857, "allin": 0.586 }
+      "profile": {
+        "tight": 0.193,
+        "aggression": 1.53,
+        "bluff": 1.174,
+        "call": 0.857,
+        "allin": 0.586
+      }
     },
     {
       "name": "祐天寺若麦",
       "style": "直播偷鸡",
-      "profile": { "tight": 0.182, "aggression": 1.667, "bluff": 1.626, "call": 0.786, "allin": 0.477 }
+      "profile": {
+        "tight": 0.182,
+        "aggression": 1.667,
+        "bluff": 1.626,
+        "call": 0.786,
+        "allin": 0.477
+      }
     },
     {
       "name": "纯田真奈",
       "style": "超绝进化",
-      "profile": { "tight": 0.200, "aggression": 1.700, "bluff": 1.554, "call": 0.772, "allin": 0.522 }
+      "profile": {
+        "tight": 0.2,
+        "aggression": 1.7,
+        "bluff": 1.554,
+        "call": 0.772,
+        "allin": 0.522
+      }
     }
   ]
 }
