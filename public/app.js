@@ -164,6 +164,7 @@ function render() {
   const map = { waiting: '等待开始', playing: `第 ${s.handNumber} 局 · ${streetName(s.street)}`, showdown: '本局结束' };
   $('statusLabel').textContent = map[s.status] || '';
   $('hostBtn').classList.toggle('hidden', !s.you.isHost);
+  $('addBotTopBtn').classList.toggle('hidden', !s.you.isHost);
 
   renderBoard();
   renderPot();
@@ -736,6 +737,7 @@ function renderGrantList() {
 }
 $('hostBtn').onclick = () => { $('hostPanel').classList.remove('hidden'); renderGrantList(); };
 $('addBotBtn').onclick = () => send({ type: 'addBot' });
+$('addBotTopBtn').onclick = () => send({ type: 'addBot' });
 $('hostClose').onclick = () => $('hostPanel').classList.add('hidden');
 $('hostPanel').onclick = (e) => { if (e.target.id === 'hostPanel') $('hostPanel').classList.add('hidden'); };
 document.querySelectorAll('.grant-all').forEach((b) => {

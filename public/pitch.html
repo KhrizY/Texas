@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Texas Hold'em — 项目路演</title>
+<style>
+/* ===== RESET & VARS ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0c1218; --srf:#141e27; --srf2:#1c2733;
+  --gold:#e6b94a; --gold2:#f2d680;
+  --acc:#5599f5; --tx1:#eff3f8; --tx2:#8f9fb3; --tx3:#536477;
+  --red:#e85d4a; --grn:#38b46a; --ln:#243544;
+  --r:14px; --rs:8px;
+  --f:"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif;
+}
+
+html,body{height:100%;overflow:hidden;font-family:var(--f);background:var(--bg);color:var(--tx1);font-size:16px;line-height:1.6}
+body{
+  background-image:
+    radial-gradient(ellipse 900px 500px at 50% 0%, rgba(13,122,85,.09) 0%, transparent 70%),
+    radial-gradient(ellipse 600px 700px at 85% 100%, rgba(85,153,245,.04) 0%, transparent 60%);
+}
+
+/* ===== DECK ===== */
+.deck{width:100%;height:100%;position:relative;overflow:hidden;user-select:none}
+
+/* ===== SLIDE BASE ===== */
+.slide{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:clamp(40px,8vh,72px) clamp(44px,10vw,100px);
+  opacity:0;transform:translateY(16px);
+  transition:opacity .42s ease,transform .42s ease;
+  z-index:0;overflow:auto;
+}
+.slide.active{opacity:1;transform:none;z-index:1}
+
+/* page indicator */
+.slide-pos{
+  position:absolute;bottom:24px;right:32px;
+  font-size:12px;color:var(--tx3);letter-spacing:1.5px;font-weight:600;z-index:5;
+}
+
+/* ---- slide inner wrapper: constrain width & vertical rhythm ---- */
+.slide-inner{width:100%;max-width:960px;display:flex;flex-direction:column;gap:clamp(18px,2.6vh,28px)}
+
+/* ===== TYPOGRAPHY HIERARCHY ===== */
+.h2{
+  font-size:clamp(28px,3.8vw,46px);font-weight:800;color:var(--tx1);
+  letter-spacing:-0.5px;line-height:1.1;
+  padding-bottom:14px;border-bottom:3px solid var(--gold);
+  display:inline-block;align-self:flex-start;
+}
+.lede{
+  font-size:clamp(13px,1.3vw,14px);color:var(--tx3);
+  font-weight:550;margin-top:-8px;
+}
+.strong{color:var(--gold);font-weight:700}
+
+/* ===== CARDS ===== */
+.crd{
+  background:var(--srf);border:1px solid var(--ln);
+  border-radius:var(--r);padding:clamp(18px,2.4vh,26px) clamp(20px,2.8vw,30px);
+  display:flex;flex-direction:column;gap:10px;
+}
+.crd-h{font-size:clamp(15px,1.6vw,18px);font-weight:700;color:var(--gold);letter-spacing:.2px}
+.crd-b{font-size:clamp(13px,1.25vw,14px);color:var(--tx2);font-weight:450;line-height:1.6}
+.crd-b li{list-style:none;padding-left:14px;position:relative;margin-bottom:5px}
+.crd-b li::before{content:'\2022';position:absolute;left:0;color:var(--tx3)}
+
+/* ---- special card: solution banner ---- */
+.crd-sol{
+  background:linear-gradient(135deg,rgba(13,122,85,.10),var(--srf));
+  border-color:rgba(230,185,74,.22)
+}
+.crd-sol .crd-b{color:var(--gold2);font-weight:550}
+
+/* ===== GRIDS ===== */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:clamp(14px,1.8vw,22px)}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(14px,1.8vw,22px)}
+.g2x3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:clamp(12px,1.6vw,18px)}
+.g6{display:grid;grid-template-columns:1fr 1fr 1fr;gap:clamp(12px,1.6vw,18px)}
+
+/* ===== FEATURE CARDS ===== */
+.fcard{
+  background:var(--srf);border:1px solid var(--ln);border-radius:var(--r);
+  padding:clamp(22px,2.8vh,32px) clamp(20px,2.6vw,28px);
+  text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.fcard .ico{font-size:clamp(30px,3.5vw,42px)}
+.fcard .fc-h{font-size:clamp(16px,1.7vw,20px);font-weight:800;color:var(--gold)}
+.fcard .fc-b{font-size:clamp(12px,1.15vw,13.5px);color:var(--tx2);font-weight:450;line-height:1.55;max-width:240px}
+
+/* ===== TABLE ===== */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th,.tbl td{text-align:left;padding:clamp(7px,1vh,10px) 14px;font-size:clamp(11px,1.1vw,13px);border-bottom:1px solid var(--ln)}
+.tbl th{color:var(--tx3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+.tbl td{color:var(--tx2);font-weight:450;line-height:1.5}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10.5px;font-weight:700}
+.badge-r{background:rgba(232,93,74,.16);color:var(--red)}
+.badge-g{background:rgba(230,185,74,.16);color:var(--gold)}
+
+/* ===== PHASE FLOW (3-col) ===== */
+.pflow{display:flex;gap:14px;align-items:stretch}
+.p{
+  flex:1;background:var(--srf);border:1px solid var(--ln);
+  border-radius:var(--r);padding:clamp(16px,2vh,22px);display:flex;flex-direction:column;gap:12px;
+  position:relative;
+}
+.p-num{
+  width:30px;height:30px;border-radius:50%;background:var(--gold);
+  color:var(--bg);display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:800;flex-shrink:0;
+}
+.p-h{font-size:15px;font-weight:700;color:var(--tx1)}
+.p-b{font-size:11.5px;color:var(--tx2);line-height:1.55;font-weight:450}
+.p-b strong{color:var(--gold);font-weight:700}
+
+/* ===== STATS ===== */
+.srow{display:flex;gap:14px;flex-wrap:wrap}
+.s{flex:1;min-width:110px;background:var(--srf);border:1px solid var(--ln);border-radius:var(--rs);padding:clamp(12px,1.8vh,18px) 16px;text-align:center}
+.s-val{font-size:clamp(20px,2.4vw,28px);font-weight:800;color:var(--gold);line-height:1.1}
+.s-lab{font-size:11px;color:var(--tx3);margin-top:4px;font-weight:550}
+
+/* ===== FUTURE ===== */
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fitm{
+  background:var(--srf2);border-radius:var(--rs);padding:11px 14px;
+  font-size:12.5px;color:var(--tx2);font-weight:450;
+  display:flex;align-items:center;gap:7px;line-height:1.35;
+}
+.fitm .fic{font-size:14px;flex-shrink:0}
+
+/* ===== COVER SPECIAL ===== */
+.cover{align-items:flex-start;padding-top:16vh}
+.cover-tag{
+  display:inline-block;font-size:12px;font-weight:700;color:var(--gold);
+  border:1px solid rgba(230,185,74,.3);border-radius:20px;
+  padding:5px 18px;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;
+}
+.cover h1{font-size:clamp(42px,6.5vw,72px);font-weight:800;line-height:1.1;letter-spacing:-1px}
+.cover h1 em{font-style:normal;color:var(--gold)}
+.cover .sub{font-size:clamp(15px,1.8vw,19px);color:var(--tx2);font-weight:450;line-height:1.55;margin-top:4px}
+.cover .date{font-size:13px;color:var(--tx3);margin-top:2px;font-weight:550}
+
+/* ===== NAV ===== */
+.nav{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  display:flex;gap:7px;z-index:100;
+}
+.nav .dot{
+  width:8px;height:8px;border-radius:50%;border:0;padding:0;cursor:pointer;
+  background:var(--tx3);transition:background .25s,width .25s;
+}
+.nav .dot.cur{background:var(--gold);width:24px;border-radius:4px}
+.nav-arr{
+  position:fixed;top:50%;transform:translateY(-50%);z-index:100;
+  width:42px;height:42px;border-radius:50%;border:1px solid var(--ln);
+  background:var(--srf);color:var(--tx2);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+  transition:background .2s,color .2s;
+}
+.nav-arr:hover{background:var(--srf2);color:var(--gold)}
+#arrL{left:clamp(6px,2vw,22px)}#arrR{right:clamp(6px,2vw,22px)}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:700px){
+  .slide{padding:28px 22px;justify-content:flex-start;padding-top:48px}
+  .g2,.g3,.g2x3,.g6{grid-template-columns:1fr}
+  .pflow{flex-direction:column}
+  .cover h1{font-size:34px}
+  .h2{font-size:26px}
+  .s{min-width:80px}
+  .nav-arr{width:32px;height:32px;font-size:14px}
+  .slide-pos{right:18px;bottom:18px}
+  .srow{gap:8px}
+}
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+<!-- ====== 1. COVER ====== -->
+<div class="slide cover active" data-slide="0">
+  <div class="slide-inner">
+    <div class="cover-tag">Project Pitch</div>
+    <h1>Texas <em>Hold'em</em></h1>
+    <div class="sub">一款为解决碎片等待时间而生的多人联网德州扑克<br>16 角色化 AI · 自学习进化 · 打开即玩</div>
+    <div class="date">2026.07.07 — 07.09</div>
+  </div>
+  <div class="slide-pos">1 / 10</div>
+</div>
+
+<!-- ====== 2. WHY ====== -->
+<div class="slide" data-slide="1">
+  <div class="slide-inner">
+    <div class="h2">为什么做这个产品？</div>
+
+    <div class="g2">
+      <div class="crd">
+        <div class="crd-h">痛点 ① &nbsp;写代码时的碎片空档</div>
+        <div class="crd-b">等 AI 生成、等部署、等训练——每次 <span class="strong">几十秒到几分钟的等待</span>。刷手机太跳脱，切回来思路全断。</div>
+      </div>
+      <div class="crd">
+        <div class="crd-h">痛点 ② &nbsp;聚会等人凑不齐</div>
+        <div class="crd-b">约桌游、约吃饭，<span class="strong">总有人晚到</span>。人到不齐、有人在忙——先到的人只能干等。</div>
+      </div>
+    </div>
+
+    <div class="crd crd-sol">
+      <div class="crd-h">💡 解决方案</div>
+      <div class="crd-b">一款<strong>打开即玩、随时能停</strong>的在线德州扑克——两分钟一局恰好填满碎片时间。Bot 补位，单人也能开打；凑齐人自动变真人局。</div>
+    </div>
+  </div>
+  <div class="slide-pos">2 / 10</div>
+</div>
+
+<!-- ====== 3. FEATURES ====== -->
+<div class="slide" data-slide="2">
+  <div class="slide-inner">
+    <div class="h2">三大核心特点</div>
+    <div class="g3">
+      <div class="fcard">
+        <div class="ico">🔌</div>
+        <div class="fc-h">极简易用</div>
+        <div class="fc-b">不到 50KB，不用装任何东西。浏览器打开就能玩——<strong>不用下载、不用注册、不用登录</strong>。微信发个链接，点开就坐。</div>
+      </div>
+      <div class="fcard">
+        <div class="ico">💬</div>
+        <div class="fc-h">社交对战</div>
+        <div class="fc-b">实时在线对战。内置聊天框 + 9 种表情 + <strong>电脑会自动发回应表情</strong>。还能设密码开房，只让朋友进来。</div>
+      </div>
+      <div class="fcard">
+        <div class="ico">🤖</div>
+        <div class="fc-h">智能 AI</div>
+        <div class="fc-b">16 个性格各异的电脑对手。人不够电脑凑，<strong>一个人也能打</strong>。电脑还会从你的打法中学习，越玩越像真人。</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-pos">3 / 10</div>
+</div>
+
+<!-- ====== 4. MVP ====== -->
+<div class="slide" data-slide="3">
+  <div class="slide-inner">
+    <div class="h2">MVP · 跑通核心玩法</div>
+    <div class="lede">第一优先级：把一局德州扑克完整跑通</div>
+
+    <div class="g2">
+      <div class="crd">
+        <div class="crd-h">🃏 真实发牌</div>
+        <div class="crd-b"><ul><li>52 张牌随机洗乱，无法预测</li><li>每人 2 张手牌 + 5 张公共牌</li></ul></div>
+      </div>
+      <div class="crd">
+        <div class="crd-h">💰 完整下注</div>
+        <div class="crd-b"><ul><li>盲注 → 翻牌前 → 翻牌 → 转牌 → 河牌</li><li>跟注、加注、弃牌、全下，一个不落</li></ul></div>
+      </div>
+      <div class="crd">
+        <div class="crd-h">🏆 自动比牌</div>
+        <div class="crd-b"><ul><li>7 张选最好的 5 张，自动判胜负</li><li>高牌 → 一对 → … → 皇家同花顺</li></ul></div>
+      </div>
+      <div class="crd">
+        <div class="crd-h">🥘 边池分钱</div>
+        <div class="crd-b"><ul><li>多人全下时自动算清楚谁该得多少</li><li>主池 + 边池，一分不差</li></ul></div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;color:var(--gold);font-weight:700;font-size:14px">
+      <span style="font-size:18px">⚡</span> 2 小时内跑通全链路：发牌 → 下注 → 摊牌 → 比牌 → 分池
+    </div>
+  </div>
+  <div class="slide-pos">4 / 10</div>
+</div>
+
+<!-- ====== 5. FEATURE OPT ====== -->
+<div class="slide" data-slide="4">
+  <div class="slide-inner">
+    <div class="h2">功能优化 · 从能玩到好用</div>
+    <div class="lede">MVP 能跑起来，但离"好用"还有距离——补齐操作体验与稳定性</div>
+
+    <div class="g2">
+      <div class="crd"><div class="crd-h">🎁 筹码增发</div><div class="crd-b">房主一键发筹码，输光了还能继续玩</div></div>
+      <div class="crd"><div class="crd-h">🤖 电脑补位</div><div class="crd-b">12 个性格各异的电脑对手，保证每局都满人</div></div>
+      <div class="crd"><div class="crd-h">⏩ 自动接局</div><div class="crd-b">人满自动开，打完自动下一局，不用手动操作</div></div>
+      <div class="crd"><div class="crd-h">🚪 掉线清退</div><div class="crd-b">人走了自动让位，不影响正在进行的牌局</div></div>
+      <div class="crd"><div class="crd-h">🔢 弹性座位</div><div class="crd-b">6 人到 9 人，人多自动加座，均匀围坐一圈</div></div>
+      <div class="crd"><div class="crd-h">🔒 密码房间</div><div class="crd-b">设个密码，只有自己人能进来</div></div>
+    </div>
+
+    <div style="font-size:14px;color:var(--tx2);font-weight:500">
+      <span class="strong">心思</span>：房主不用操心运营，坐下就是打牌。
+    </div>
+  </div>
+  <div class="slide-pos">5 / 10</div>
+</div>
+
+<!-- ====== 6. UI/UX ====== -->
+<div class="slide" data-slide="5">
+  <div class="slide-inner">
+    <div class="h2">UI / UX · 打造赌场级体验</div>
+
+    <div class="g2">
+      <div class="crd"><div class="crd-h">🎨 牌桌</div><div class="crd-b">赌场风深绿绒面桌 · 四层木框镶边 · 金色下注线 · 桌面中央水印</div></div>
+      <div class="crd"><div class="crd-h">🧑‍🤝‍🧑 玩家卡片</div><div class="crd-b">头像、昵称、筹码一目了然 · 轮到谁谁高亮 · 身份标签不混淆</div></div>
+      <div class="crd"><div class="crd-h">🎬 动画细节</div><div class="crd-b">翻牌一张一张亮 · 筹码飞进彩池 · 倒计时光环提示 · 发牌有停顿节奏</div></div>
+      <div class="crd"><div class="crd-h">🏷️ 筹码视觉</div><div class="crd-b">大额颜色深、小额颜色浅 · 堆叠有层次 · 金额标注清晰</div></div>
+      <div class="crd"><div class="crd-h">📱 手机也能玩</div><div class="crd-b">电脑全尺寸 · 手机竖着比划 · 手机横过来也不变形 · 聊天框自适应</div></div>
+      <div class="crd"><div class="crd-h">🔍 双指缩放</div><div class="crd-b">点按钮 ± 调大小，手指捏合也行，下次打开自动记住</div></div>
+    </div>
+
+    <div style="font-size:14px;color:var(--tx2);font-weight:500">
+      <span class="strong">纯手写</span>：不依赖任何第三方框架，全部自己一行一行敲出来。动画也全用手写 CSS 实现。
+    </div>
+  </div>
+  <div class="slide-pos">6 / 10</div>
+</div>
+
+<!-- ====== 7. BETA ====== -->
+<div class="slide" data-slide="6">
+  <div class="slide-inner">
+    <div class="h2">上线内测 · 真实反馈涌入</div>
+    <div class="lede">写好代码推上去，自动上线，获得网址。发给同学，十几个人同时涌进来——</div>
+
+    <table class="tbl">
+      <tr><th style="width:40%">反馈</th><th style="width:10%">程度</th><th style="width:50%">行动</th></tr>
+      <tr><td>手机竖屏，下面的按钮和牌桌挤在一起</td><td><span class="badge badge-r">高</span></td><td>重排手机端按钮位置，拉开间距</td></tr>
+      <tr><td>手机横过来，牌桌被压成一条线</td><td><span class="badge badge-r">高</span></td><td>专门适配横屏，让牌桌正常显示</td></tr>
+      <tr><td>加注只能拖滑块，不精确</td><td><span class="badge badge-g">中</span></td><td>加两个 ± 按钮，按一下加一点</td></tr>
+      <tr><td>牌一下全翻开，没有看牌的紧张感</td><td><span class="badge badge-g">中</span></td><td>改成一张一张翻，间隔半秒</td></tr>
+      <tr><td>点了空座位没反应，以为卡死了</td><td><span class="badge badge-g">中</span></td><td>加提示文字"等下一局哦"</td></tr>
+      <tr><td>聊天收不到提醒，错过消息</td><td><span class="badge badge-g">中</span></td><td>加未读红点，新消息会闪烁</td></tr>
+      <tr><td>电脑太笨了，没意思</td><td><span class="badge badge-g">中</span></td><td>触发后面两轮 AI 大升级</td></tr>
+    </table>
+
+    <div style="font-size:14px;color:var(--tx2);font-weight:500">
+      <span class="strong">最大收获</span>：自己写的东西，别人一用就暴露所有问题。听到反馈马上改、马上上线，这个节奏最值钱。
+    </div>
+  </div>
+  <div class="slide-pos">7 / 10</div>
+</div>
+
+<!-- ====== 8. SOCIAL ====== -->
+<div class="slide" data-slide="7">
+  <div class="slide-inner">
+    <div class="h2">社交优化 · 聊天 + 表情</div>
+    <div class="lede">朋友反馈"不够热闹"——把社交属性拉满</div>
+
+    <div class="g2">
+      <div class="crd">
+        <div class="crd-h">💬 聊天系统</div>
+        <div class="crd-b"><ul>
+          <li>电脑上从右边滑出 / 手机上从底部弹出</li>
+          <li>消息实时送达 · 自动过滤有害内容</li>
+          <li>关着面板也有红点提醒 · 新消息闪烁呼吸灯</li>
+        </ul></div>
+      </div>
+      <div class="crd">
+        <div class="crd-h">😈 表情系统</div>
+        <div class="crd-b"><ul>
+          <li>点玩家头像旁的 😊 → 弹出 9 种表情随便选</li>
+          <li>选中后所有人屏幕上飘过，1 秒多渐隐消失</li>
+          <li>电脑也会自动发：下重注→💪🔥 诈唬→😈👀 弃牌→🤔</li>
+        </ul></div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:center;gap:12px;font-size:26px">😈👀🎉💪🔥😂🤔👋💨</div>
+
+    <div style="font-size:14px;color:var(--tx2);font-weight:500;text-align:center">
+      从"安静打牌"到<span class="strong">"边打边聊边互怼"</span>——聊天热闹了，大家就更愿意多玩几局。
+    </div>
+  </div>
+  <div class="slide-pos">8 / 10</div>
+</div>
+
+<!-- ====== 9. AI ====== -->
+<div class="slide" data-slide="8">
+  <div class="slide-inner">
+    <div class="h2">AI 进化 · 三步迭代</div>
+
+    <div class="pflow">
+      <div class="p">
+        <div class="p-num">1</div>
+        <div class="p-h">学习专业打法</div>
+        <div class="p-b">研究德州扑克的高手策略：坐什么位置该怎么打、什么牌值得冲、什么时候该吓唬人。<br><br>给每个电脑角色设 <strong>5 个性格参数</strong>：保守/激进、爱诈/老实、敢跟/谨慎、敢全下/求稳。<br><br>12 个角色，各有各的打法脾气。</div>
+      </div>
+      <div class="p">
+        <div class="p-num">2</div>
+        <div class="p-h">模拟进化训练</div>
+        <div class="p-b"><strong>30 组 × 20 代 × 每代 1 万局</strong><br>= <strong>3600 万局电脑互相打</strong><br><br>赢得多的留下，输的淘汰<br>胜者之间交叉组合 + 小幅变异<br><br>训练完输出 16 个角色参数<br><code style="background:var(--srf2);padding:2px 8px;border-radius:4px;font-size:11px">npm run train</code></div>
+      </div>
+      <div class="p">
+        <div class="p-num">3</div>
+        <div class="p-h">边玩边学</div>
+        <div class="p-b"><strong>📝 记</strong>：每局电脑怎么出牌，记下当时情况<br><br><strong>🏅 打分</strong>：赢了+攻击性强=高分 · 诈赢了=最高分 · 输了+乱跟=扣分<br><br><strong>🔄 等人走了</strong>：真人全离线后自动运行<br><br><strong>🔧 微调</strong>：哪个角色厉害就往哪边调一点</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-pos">9 / 10</div>
+</div>
+
+<!-- ====== 10. DATA & FUTURE ====== -->
+<div class="slide" data-slide="9">
+  <div class="slide-inner">
+    <div class="h2">数据一览 & 未来规划</div>
+
+    <div class="g2">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="srow">
+          <div class="s"><div class="s-val">2 天</div><div class="s-lab">开发周期</div></div>
+          <div class="s"><div class="s-val">8 版本</div><div class="s-lab">迭代表</div></div>
+          <div class="s"><div class="s-val">12 次</div><div class="s-lab">代码提交</div></div>
+          <div class="s"><div class="s-val">~3000 行</div><div class="s-lab">代码量</div></div>
+        </div>
+        <div class="srow">
+          <div class="s"><div class="s-val">3600 万</div><div class="s-lab">AI 训练局数</div></div>
+          <div class="s"><div class="s-val">16 个</div><div class="s-lab">电脑角色</div></div>
+          <div class="s"><div class="s-val">&lt;50 KB</div><div class="s-lab">网页大小</div></div>
+          <div class="s"><div class="s-val">54 项</div><div class="s-lab">自动化测试</div></div>
+        </div>
+      </div>
+
+      <div class="crd" style="padding:clamp(14px,2vh,20px)">
+        <div class="crd-h">🔮 后续规划</div>
+        <div class="fgrid">
+          <div class="fitm"><span class="fic">🔄</span>手牌历史回放</div>
+          <div class="fitm"><span class="fic">⌨️</span>快捷键操作</div>
+          <div class="fitm"><span class="fic">🏆</span>摊牌显示牌型名</div>
+          <div class="fitm"><span class="fic">📊</span>个人战绩统计</div>
+          <div class="fitm"><span class="fic">🏟️</span>锦标赛模式</div>
+          <div class="fitm"><span class="fic">👀</span>围观模式</div>
+          <div class="fitm"><span class="fic">📱</span>断网也能玩</div>
+          <div class="fitm"><span class="fic">🧠</span>AI 更精细调教</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:14px;color:var(--tx2);font-weight:500;text-align:center">
+      从想法到上线，<span class="strong">2 天迭代 8 个版本</span>。个人项目、毕设展示、黑客马拉松的理想节奏——想到就做，做完就上，上了就听反馈。
+    </div>
+  </div>
+  <div class="slide-pos">10 / 10</div>
+</div>
+
+<!-- ===== NAV ===== -->
+<button class="nav-arr" id="arrL" title="上一页">&#9664;</button>
+<button class="nav-arr" id="arrR" title="下一页">&#9654;</button>
+<div class="nav" id="navDots"></div>
+
+</div><!-- /.deck -->
+
+<script>
+(function(){
+  const deck=document.getElementById('deck'), slides=deck.querySelectorAll('.slide'), dots=document.getElementById('navDots');
+  let idx=0, total=slides.length;
+  for(let i=0;i<total;i++){const d=document.createElement('button');d.className='dot';d.onclick=()=>go(i);dots.appendChild(d)}
+  const navDots=dots.querySelectorAll('.dot');navDots[0].classList.add('cur');
+  function go(n){
+    if(n<0||n>=total)return;slides[idx].classList.remove('active');navDots[idx].classList.remove('cur');
+    idx=n;slides[idx].classList.add('active');navDots[idx].classList.add('cur');
+  }
+  document.getElementById('arrL').onclick=()=>go(idx-1);
+  document.getElementById('arrR').onclick=()=>go(idx+1);
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowLeft'||e.key==='ArrowUp')go(idx-1);
+    if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key===' ')go(idx+1);
+  });
+  let sx=0;deck.addEventListener('touchstart',e=>{sx=e.touches[0].clientX});
+  deck.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-sx;if(Math.abs(dx)>60)go(dx>0?idx-1:idx+1)});
+})();
+</script>
+</body>
+</html>
